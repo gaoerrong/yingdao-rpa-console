@@ -267,6 +267,15 @@ VITE_API_BASE_URL=http://localhost:8080
 - [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 - [SECURITY.md](./SECURITY.md)
 
+## 联系我
+
+如果你希望交流项目实现、RPA 场景落地、前端二次开发或合作事宜，可以通过微信联系我：
+
+- 微信名：`新页`
+- 所在地：`浙江 杭州`
+
+如果后续仓库中补充了微信名片图片，我会继续将二维码素材同步到公开仓。
+
 ## License
 
 本项目采用 [MIT License](./LICENSE) 开源。
