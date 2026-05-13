@@ -1,0 +1,2640 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><script>(function(){
+  function makeStore(){
+    var data = {};
+    var api = {
+      getItem: function(k){ return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : null; },
+      setItem: function(k, v){ data[k] = String(v); },
+      removeItem: function(k){ delete data[k]; },
+      clear: function(){ data = {}; },
+      key: function(i){ return Object.keys(data)[i] || null; }
+    };
+    Object.defineProperty(api, 'length', { get: function(){ return Object.keys(data).length; } });
+    return api;
+  }
+  function tryShim(name){
+    var works = false;
+    try { works = !!window[name] && typeof window[name].getItem === 'function'; void window[name].length; }
+    catch (_) { works = false; }
+    if (works) return;
+    try { Object.defineProperty(window, name, { configurable: true, value: makeStore() }); }
+    catch (_) { try { window[name] = makeStore(); } catch (__) {} }
+  }
+  tryShim('localStorage');
+  tryShim('sessionStorage');
+})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RPA Console — 企业自动化管理平台</title>
+<style>
+:root {
+  --bg: oklch(99% 0.002 240);
+  --surface: oklch(100% 0 0);
+  --fg: oklch(18% 0.012 250);
+  --muted: oklch(54% 0.012 250);
+  --border: oklch(92% 0.005 250);
+  --accent: oklch(58% 0.18 255);
+  --accent-h: oklch(52% 0.18 255);
+  --accent-l: oklch(96% 0.04 255);
+
+  --s-ok: oklch(50% 0.14 145);   --s-ok-bg: oklch(96% 0.04 145);
+  --s-run: oklch(55% 0.18 255);  --s-run-bg: oklch(96% 0.04 255);
+  --s-err: oklch(50% 0.16 22);   --s-err-bg: oklch(97% 0.04 22);
+  --s-warn: oklch(54% 0.13 60);  --s-warn-bg: oklch(97% 0.04 60);
+  --s-off: oklch(54% 0.008 250); --s-off-bg: oklch(97% 0.002 250);
+
+  --sw: 220px;
+  --hh: 52px;
+  --f: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --fd: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --fm: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, monospace;
+  --r: 5px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { font-family: var(--f); font-size: 13px; line-height: 1.5; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+
+/* ── Layout ── */
+.app { display: grid; grid-template-columns: var(--sw) 1fr; grid-template-rows: var(--hh) 1fr; height: 100vh; overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar { grid-row: 1/3; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+.brand { height: var(--hh); display: flex; align-items: center; gap: 9px; padding: 0 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.brand-ico { width: 28px; height: 28px; background: var(--fg); border-radius: var(--r); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.brand-ico svg { color: #fff; }
+.brand-text {}
+.brand-name { font-size: 13px; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; }
+.brand-sub { font-size: 10px; color: var(--muted); }
+
+.nav { padding: 6px 0; flex: 1; }
+.nav-sec { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 10px 14px 3px; }
+.ni { display: flex; align-items: center; gap: 8px; padding: 6px 14px; cursor: pointer; color: var(--muted); font-size: 13px; user-select: none; transition: background .1s, color .1s; position: relative; }
+.ni:hover { background: var(--bg); color: var(--fg); }
+.ni.active { background: var(--accent-l); color: var(--accent); font-weight: 500; }
+.ni.active::before { content: ''; position: absolute; left: 0; top: 5px; bottom: 5px; width: 2.5px; background: var(--accent); border-radius: 0 2px 2px 0; }
+.ni svg { width: 15px; height: 15px; flex-shrink: 0; }
+.chev { margin-left: auto; transition: transform .2s; width: 12px !important; height: 12px !important; }
+.ni.open > .chev { transform: rotate(90deg); }
+.nsub { display: none; }
+.nsub.open { display: block; }
+.nsi { display: flex; align-items: center; gap: 7px; padding: 5px 14px 5px 36px; cursor: pointer; color: var(--muted); font-size: 12px; user-select: none; transition: background .1s, color .1s; position: relative; }
+.nsi:hover { background: var(--bg); color: var(--fg); }
+.nsi.active { color: var(--accent); font-weight: 500; background: var(--accent-l); }
+.nsi.active::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2.5px; background: var(--accent); border-radius: 0 2px 2px 0; }
+.ndot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+.sfoot { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.avt { width: 26px; height: 26px; border-radius: 50%; background: var(--fg); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+.avt.sa { background: #5b21b6; }
+.uname { font-size: 12px; font-weight: 500; color: var(--fg); }
+.urole { font-size: 10px; color: var(--muted); }
+
+/* ── Header ── */
+.header { grid-column: 2; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 12px; position: sticky; top: 0; z-index: 20; }
+.hbg { display: none; border: none; background: none; color: var(--muted); cursor: pointer; padding: 4px; border-radius: var(--r); }
+.bc { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.bc .sep { color: var(--border); }
+.bc .cur { color: var(--fg); font-weight: 500; }
+.hrgt { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.org-sel { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--r); font-size: 12px; color: var(--fg); background: var(--bg); cursor: pointer; transition: border-color .15s; }
+.org-sel:hover { border-color: var(--accent); }
+.org-sel svg { width: 12px; height: 12px; color: var(--muted); }
+.ibtn { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: var(--r); background: none; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .1s, color .1s; }
+.ibtn:hover { background: var(--bg); color: var(--fg); }
+.ibtn svg { width: 14px; height: 14px; }
+.havt { width: 28px; height: 28px; border-radius: 50%; background: #5b21b6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+
+/* ── Header tenant/dept selectors ── */
+.hdr-sel-group { display: flex; align-items: center; border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; background: var(--surface); }
+.hdr-sel-wrap { display: flex; align-items: center; gap: 5px; padding: 0 9px; height: 30px; position: relative; }
+.hdr-sel-wrap svg:first-child { width: 12px; height: 12px; color: var(--muted); flex-shrink: 0; }
+.hdr-sel { border: none; outline: none; background: transparent; font-size: 12px; color: var(--fg); font-family: var(--f); cursor: pointer; appearance: none; padding-right: 2px; min-width: 80px; }
+.hdr-sel:focus { color: var(--accent); }
+.hdr-caret { width: 10px; height: 10px; color: var(--muted); flex-shrink: 0; pointer-events: none; }
+.hdr-sel-divider { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+.hdr-sel-group:focus-within { border-color: var(--accent); }
+
+/* ── Content ── */
+.content { grid-column: 2; display: flex; flex-direction: column; overflow: hidden; }
+.page { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+.page.active { display: flex; }
+
+.pghdr { padding: 16px 20px 0; display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0; }
+.pgtw { flex: 1; }
+.pgtitle { font-size: 17px; font-weight: 600; letter-spacing: -.02em; color: var(--fg); font-family: var(--fd); }
+.pgsub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.pgacts { display: flex; align-items: center; gap: 6px; padding-top: 2px; flex-shrink: 0; }
+
+/* ── Toolbar ── */
+.toolbar { padding: 10px 20px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+.srch { display: flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); min-width: 180px; transition: border-color .15s; }
+.srch:focus-within { border-color: var(--accent); }
+.srch svg { color: var(--muted); width: 13px; height: 13px; flex-shrink: 0; }
+.srch input { border: none; outline: none; font-size: 12px; background: transparent; color: var(--fg); width: 100%; }
+.srch input::placeholder { color: var(--muted); }
+.fsel { padding: 5px 26px 5px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); font-size: 12px; color: var(--fg); cursor: pointer; outline: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%236b7280' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 7px center; background-size: 12px; transition: border-color .15s; }
+.fsel:focus { border-color: var(--accent); }
+.sync-info { font-size: 11px; color: var(--muted); }
+.tbrgt { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: var(--r); font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .1s; white-space: nowrap; line-height: 1.4; font-family: var(--f); }
+.btn svg { width: 13px; height: 13px; }
+.btn-pri { background: var(--fg); color: #fff; border-color: var(--fg); }
+.btn-pri:hover { background: oklch(12% .012 250); }
+.btn-sec { background: var(--surface); color: var(--fg); border-color: var(--border); }
+.btn-sec:hover { background: var(--bg); border-color: oklch(82% .005 250); }
+.btn-acc { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-acc:hover { background: var(--accent-h); }
+.btn-ghost { background: none; color: var(--muted); border-color: transparent; }
+.btn-ghost:hover { background: var(--bg); color: var(--fg); }
+.btn-sm { padding: 4px 8px; font-size: 11px; }
+.btn-sm svg { width: 11px; height: 11px; }
+.btn.syncing { opacity: .7; pointer-events: none; }
+
+/* ── Table ── */
+.tblwrap { flex: 1; overflow: auto; padding: 0 20px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead th { padding: 7px 10px; text-align: left; font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); background: var(--bg); white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; cursor: default; }
+tbody tr:hover { background: var(--bg); }
+tbody tr:last-child { border-bottom: none; }
+tbody tr.sel { background: var(--accent-l); }
+tbody td { padding: 9px 10px; vertical-align: middle; color: var(--fg); }
+.cp { font-weight: 500; }
+.cm { color: var(--muted); }
+.cmono { font-family: var(--fm); font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+input[type=checkbox] { width: 13px; height: 13px; accent-color: var(--accent); cursor: pointer; }
+
+/* ── Pills ── */
+.pill { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 9px; font-size: 10px; font-weight: 500; white-space: nowrap; }
+.pdot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.p-ok { color: var(--s-ok); background: var(--s-ok-bg); }
+.p-run { color: var(--s-run); background: var(--s-run-bg); }
+.p-err { color: var(--s-err); background: var(--s-err-bg); }
+.p-warn { color: var(--s-warn); background: var(--s-warn-bg); }
+.p-off { color: var(--s-off); background: var(--s-off-bg); }
+.p-dis { color: var(--muted); background: var(--s-off-bg); }
+.p-en { color: var(--s-ok); background: var(--s-ok-bg); }
+.p-hi { color: var(--s-err); background: var(--s-err-bg); }
+.p-mid { color: var(--s-warn); background: var(--s-warn-bg); }
+.p-lo { color: var(--muted); background: var(--s-off-bg); }
+.p-sa { color: #5b21b6; background: #f5f3ff; }
+.p-ta { color: var(--accent); background: var(--accent-l); }
+.p-mb { color: var(--muted); background: var(--s-off-bg); }
+
+/* ── Tags ── */
+.tags { display: flex; flex-wrap: wrap; gap: 3px; }
+.tag { display: inline-flex; align-items: center; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 500; background: var(--accent-l); color: var(--accent); }
+.tg { background: var(--s-ok-bg); color: var(--s-ok); }
+.to { background: var(--s-warn-bg); color: var(--s-warn); }
+.tgr { background: var(--s-off-bg); color: var(--muted); }
+
+/* ── Action cells ── */
+.acts { display: flex; align-items: center; gap: 1px; }
+.a { padding: 3px 7px; border: none; background: none; color: var(--muted); font-size: 11px; font-weight: 500; cursor: pointer; border-radius: 3px; transition: all .1s; white-space: nowrap; font-family: var(--f); }
+.a:hover { background: var(--bg); color: var(--fg); }
+.a.t:hover { color: var(--accent); background: var(--accent-l); }
+.a.d:hover { color: var(--s-err); background: var(--s-err-bg); }
+.asep { color: oklch(88% .005 250); font-size: 11px; user-select: none; }
+
+/* ── Pagination ── */
+.pgn { padding: 10px 20px; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.pgni { margin-right: auto; }
+.pgb { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--fg); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .1s; font-family: var(--f); }
+.pgb:hover { border-color: var(--accent); color: var(--accent); }
+.pgb.cur { background: var(--fg); color: #fff; border-color: var(--fg); }
+.pgb:disabled { opacity: .35; cursor: default; }
+
+/* ── Drawer ── */
+.drawer-ov { display: none; position: fixed; inset: 0; background: oklch(0% 0 0 / .12); z-index: 40; }
+.drawer-ov.open { display: block; }
+.drawer { position: fixed; right: 0; top: 0; bottom: 0; width: 500px; background: var(--surface); border-left: 1px solid var(--border); z-index: 50; display: flex; flex-direction: column; transform: translateX(100%); transition: transform .25s ease; box-shadow: -4px 0 24px oklch(0% 0 0 / .07); }
+.drawer.open { transform: translateX(0); }
+.drwhdr { padding: 13px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.drwtitle { font-size: 14px; font-weight: 600; flex: 1; }
+.drwclose { width: 22px; height: 22px; border: none; background: none; color: var(--muted); cursor: pointer; border-radius: 3px; display: flex; align-items: center; justify-content: center; transition: background .1s; }
+.drwclose:hover { background: var(--bg); color: var(--fg); }
+.drwbody { flex: 1; overflow-y: auto; padding: 16px; }
+.dsec { margin-bottom: 18px; }
+.dsec-t { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 8px; }
+.dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dit label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 2px; }
+.dit .val { font-size: 12px; color: var(--fg); }
+.logarea { background: oklch(98% .002 240); border: 1px solid var(--border); border-radius: var(--r); padding: 10px 12px; font-family: var(--fm); font-size: 11px; line-height: 1.7; color: var(--fg); max-height: 180px; overflow-y: auto; }
+.lt { color: var(--muted); }
+.li { color: var(--accent); }
+.lok { color: var(--s-ok); }
+.ler { color: var(--s-err); }
+.drwfoot { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ── Modal ── */
+.mov { display: none; position: fixed; inset: 0; background: oklch(0% 0 0 / .3); z-index: 60; align-items: center; justify-content: center; }
+.mov.open { display: flex; }
+.modal { background: var(--surface); border-radius: 8px; box-shadow: 0 8px 32px oklch(0% 0 0 / .12); width: 90%; max-width: 460px; max-height: 85vh; display: flex; flex-direction: column; }
+.mhdr { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; }
+.mtitle { font-size: 14px; font-weight: 600; flex: 1; font-family: var(--fd); }
+.mclose { width: 22px; height: 22px; border: none; background: none; color: var(--muted); cursor: pointer; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+.mclose:hover { background: var(--bg); }
+.mbody { padding: 18px; overflow-y: auto; flex: 1; }
+.mfoot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 6px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 11px; font-weight: 500; color: var(--fg); margin-bottom: 5px; }
+.field .req { color: var(--s-err); }
+.field input, .field textarea, .field select { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--r); font-size: 12px; color: var(--fg); background: var(--surface); outline: none; font-family: var(--f); transition: border-color .15s; }
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); }
+.field textarea { resize: vertical; min-height: 68px; }
+.field-hint { font-size: 10px; color: var(--muted); margin-top: 3px; }
+.step-bar { display: flex; align-items: center; gap: 4px; margin-bottom: 18px; }
+.step { width: 28px; height: 4px; border-radius: 2px; background: var(--border); }
+.step.done { background: var(--accent); }
+.step.cur { background: var(--accent); opacity: .5; }
+.step-label { font-size: 10px; color: var(--muted); margin-left: 6px; }
+
+/* ── Toast ── */
+.toast { position: fixed; top: 16px; right: 16px; background: var(--fg); color: #fff; padding: 9px 14px; border-radius: var(--r); font-size: 12px; z-index: 200; transform: translateY(-6px); opacity: 0; transition: all .2s; pointer-events: none; display: flex; align-items: center; gap: 6px; }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.ok { background: var(--s-ok); }
+.toast.err { background: var(--s-err); }
+
+/* ── Mobile ── */
+.mob-ov { display: none; position: fixed; inset: 0; background: oklch(0% 0 0 / .2); z-index: 35; }
+.mob-ov.show { display: block; }
+
+@media (max-width: 768px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: var(--hh) 1fr; }
+  .sidebar { grid-row: auto; position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; transform: translateX(-100%); transition: transform .25s; width: 220px; box-shadow: 4px 0 20px oklch(0% 0 0 / .08); }
+  .sidebar.open { transform: translateX(0); }
+  .header, .content { grid-column: 1; }
+  .hbg { display: flex !important; }
+  .drawer { width: 100%; }
+  .tblwrap { padding: 0 14px; }
+  .toolbar { padding: 8px 14px; }
+  .pghdr { padding: 14px 14px 0; }
+  .pgn { padding: 8px 14px; }
+  .dgrid { grid-template-columns: 1fr; }
+  .hm { display: none; }
+}
+
+@media (min-width: 769px) {
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: oklch(88% .005 250); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+}
+
+/* spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { width: 13px; height: 13px; border: 2px solid oklch(80% .005 250); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; flex-shrink: 0; }
+
+/* running blink */
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.blink { animation: blink 1.5s ease infinite; }
+
+/* divider */
+.hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+/* ── Org tabs ── */
+.tab-btn { padding: 7px 16px; border: none; background: none; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; font-family: var(--f); transition: color .15s, border-color .15s; }
+.tab-btn:hover { color: var(--fg); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+/* ── Color option selected state ── */
+.color-opt.selected { border-color: var(--fg) !important; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--fg); }
+
+
+/* ── Overview KPI cards ── */
+.kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 16px 20px; flex-shrink: 0; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+.kpi-label { font-size: 10px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.kpi-val { font-size: 24px; font-weight: 700; color: var(--fg); font-family: var(--fd); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.kpi-sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
+.kpi-ok .kpi-val { color: var(--s-ok); }
+.kpi-err .kpi-val { color: var(--s-err); }
+.kpi-acc .kpi-val { color: var(--accent); }
+.chart-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; padding: 0 20px 16px; flex: 1; min-height: 0; }
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; overflow: hidden; }
+.chart-title { font-size: 12px; font-weight: 600; color: var(--fg); margin-bottom: 12px; }
+.mini-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 11px; }
+.mini-bar-label { width: 90px; color: var(--muted); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-bar-track { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.mini-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+.mini-bar-fill.ok { background: var(--s-ok); }
+.mini-bar-fill.err { background: var(--s-err); }
+.mini-bar-num { width: 30px; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; font-family: var(--fm); font-size: 10px; }
+.trend-svg { flex: 1; min-height: 0; }
+
+@media (max-width: 768px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="mob-ov" id="mobOv" onclick="closeSidebar()"></div>
+
+<div class="app">
+<!-- ═══════════ SIDEBAR ═══════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-ico">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/>
+        <rect x="2" y="9" width="5" height="5" rx="1"/><path d="M9 11.5h5M11.5 9v5"/>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <div class="brand-name">RPA Console</div>
+      <div class="brand-sub">企业自动化管理平台</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <div class="ni" id="ni-overview" onclick="navigate('overview')">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+        <rect x="1.5" y="1.5" width="5" height="5" rx=".8"/><rect x="8.5" y="1.5" width="5" height="5" rx=".8"/>
+        <rect x="1.5" y="8.5" width="5" height="5" rx=".8"/><rect x="8.5" y="8.5" width="5" height="5" rx=".8"/>
+      </svg>
+      概览
+    </div>
+
+    <div class="nav-sec">调度</div>
+
+    <div class="ni open" id="ni-schedule" onclick="toggleGroup('schedule')">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+        <rect x="1.5" y="2" width="12" height="11" rx="1.2"/><path d="M4.5 1v2M10.5 1v2M1.5 5.5h12"/>
+        <path d="M5 8.5h2M8 8.5h2M5 11h2"/>
+      </svg>
+      调度管理
+      <svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 4.5l3 3 3-3" transform="rotate(-90 6 6)"/></svg>
+    </div>
+    <div class="nsub open" id="nsub-schedule">
+      <div class="nsi active" id="nsi-tasks" onclick="navigate('tasks')"><span class="ndot"></span>调度任务</div>
+      <div class="nsi" id="nsi-executions" onclick="navigate('executions')"><span class="ndot"></span>执行记录</div>
+      <div class="nsi" id="nsi-board" onclick="navigate('board')"><span class="ndot"></span>排班看板</div>
+    </div>
+
+    <div class="nav-sec">资源</div>
+
+    <div class="ni" id="ni-resource" onclick="toggleGroup('resource')">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+        <circle cx="7.5" cy="5" r="3"/><path d="M1.5 13.5c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+      </svg>
+      资源管理
+      <svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 4.5l3 3 3-3" transform="rotate(-90 6 6)"/></svg>
+    </div>
+    <div class="nsub" id="nsub-resource">
+      <div class="nsi" id="nsi-apps" onclick="navigate('apps')"><span class="ndot"></span>RPA 应用</div>
+      <div class="nsi" id="nsi-robots" onclick="navigate('robots')"><span class="ndot"></span>机器人</div>
+      <div class="nsi" id="nsi-tags" onclick="navigate('tags')"><span class="ndot"></span>标签管理</div>
+    </div>
+
+    <div class="nav-sec">系统</div>
+
+    <div class="ni open" id="ni-system" onclick="toggleGroup('system')">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+        <circle cx="7.5" cy="7.5" r="2"/><path d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M3.2 3.2l1 1M10.8 10.8l1 1M10.8 3.2l-1 1M4.2 10.8l-1 1"/>
+      </svg>
+      系统管理
+      <svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 4.5l3 3 3-3" transform="rotate(-90 6 6)"/></svg>
+    </div>
+    <div class="nsub open" id="nsub-system">
+      <div class="nsi" id="nsi-accounts" onclick="navigate('accounts')"><span class="ndot"></span>账号管理</div>
+      <div class="nsi" id="nsi-tenants" onclick="navigate('tenants')"><span class="ndot"></span>组织管理</div>
+      <div class="nsi" id="nsi-roles" onclick="navigate('roles')"><span class="ndot"></span>角色权限</div>
+    </div>
+  </nav>
+
+  <div class="sfoot">
+    <div class="avt sa">超</div>
+    <div>
+      <div class="uname">超级管理员</div>
+      <div class="urole">Super Admin</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header class="header">
+  <button class="hbg" onclick="toggleSidebar()">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <path d="M2 4h12M2 8h12M2 12h12"/>
+    </svg>
+  </button>
+  <div class="bc">
+    <span>控制台</span><span class="sep">/</span>
+    <span class="cur" id="bc-cur">调度任务</span>
+  </div>
+  <div class="hrgt">
+    <div class="hdr-sel-group">
+      <div class="hdr-sel-wrap">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+          <rect x="1" y="1.5" width="10" height="9" rx=".8"/>
+          <path d="M1 4.5h10"/>
+          <path d="M4.5 1.5v3M7.5 1.5v3"/>
+        </svg>
+        <select class="hdr-sel" id="tenantSel" onchange="onTenantChange(this.value)">
+          <option value="all">全部租户</option>
+          <option value="east">华东子公司</option>
+          <option value="north">华北子公司</option>
+          <option value="south">华南子公司</option>
+          <option value="hq">总部</option>
+        </select>
+        <svg class="hdr-caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 4l3 3 3-3"/></svg>
+      </div>
+      <div class="hdr-sel-divider"></div>
+      <div class="hdr-sel-wrap">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+          <path d="M6 1a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/>
+          <path d="M1 11c0-2.8 2.2-5 5-5s5 2.2 5 5"/>
+        </svg>
+        <select class="hdr-sel" id="deptSel">
+          <option value="all">全部部门</option>
+          <option value="finance">财务部</option>
+          <option value="sales">销售部</option>
+          <option value="hr">人事部</option>
+          <option value="admin">行政部</option>
+          <option value="legal">法务部</option>
+          <option value="purchase">采购部</option>
+          <option value="tech">技术部</option>
+        </select>
+        <svg class="hdr-caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 4l3 3 3-3"/></svg>
+      </div>
+    </div>
+    <div class="havt" title="超级管理员">超</div>
+  </div>
+</header>
+
+<!-- ═══════════ CONTENT ═══════════ -->
+<main class="content">
+
+<!-- ──── PAGE: Overview ──── -->
+<div class="page" id="page-overview">
+  <div class="pghdr">
+    <div class="pgtw"><div class="pgtitle">概览</div><div class="pgsub">调度运行数据汇总 · 今日 2026-05-09</div></div>
+    <div class="pgacts">
+      <select class="fsel">
+        <option>今日</option><option>本周</option><option>本月</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">今日执行次数</div>
+      <div class="kpi-val">47</div>
+      <div class="kpi-sub">较昨日 +12%</div>
+    </div>
+    <div class="kpi kpi-ok">
+      <div class="kpi-label">今日成功率</div>
+      <div class="kpi-val">91.5%</div>
+      <div class="kpi-sub">43 成功 / 4 失败</div>
+    </div>
+    <div class="kpi kpi-acc">
+      <div class="kpi-label">活跃机器人</div>
+      <div class="kpi-val">18</div>
+      <div class="kpi-sub">共 24 台在线</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">机器人利用率</div>
+      <div class="kpi-val">63%</div>
+      <div class="kpi-sub">今日均值</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">累计执行次数</div>
+      <div class="kpi-val">12,847</div>
+      <div class="kpi-sub">自 2026-01-01 起</div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">近7日执行趋势（成功 / 失败）</div>
+      <svg class="trend-svg" viewBox="0 0 560 160" preserveAspectRatio="none" style="overflow:visible">
+        <line x1="0" y1="130" x2="560" y2="130" stroke="var(--border)" stroke-width="1"/>
+        <line x1="0" y1="97" x2="560" y2="97" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="0" y1="64" x2="560" y2="64" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="0" y1="31" x2="560" y2="31" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,4"/>
+        <path d="M20,68 L100,55 L180,72 L260,42 L340,38 L420,50 L500,28 L500,130 L420,130 L340,130 L260,130 L180,130 L100,130 L20,130 Z" fill="var(--accent)" opacity=".08"/>
+        <polyline points="20,68 100,55 180,72 260,42 340,38 420,50 500,28" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <polyline points="20,118 100,122 180,112 260,125 340,116 420,119 500,110" fill="none" stroke="var(--s-err)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4,3"/>
+        <circle cx="20" cy="68" r="3" fill="var(--accent)"/>
+        <circle cx="100" cy="55" r="3" fill="var(--accent)"/>
+        <circle cx="180" cy="72" r="3" fill="var(--accent)"/>
+        <circle cx="260" cy="42" r="3" fill="var(--accent)"/>
+        <circle cx="340" cy="38" r="3" fill="var(--accent)"/>
+        <circle cx="420" cy="50" r="3" fill="var(--accent)"/>
+        <circle cx="500" cy="28" r="3.5" fill="var(--accent)"/>
+        <text x="20" y="148" font-size="9" fill="oklch(54% .012 250)" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif">05-03</text>
+        <text x="100" y="148" font-size="9" fill="oklch(54% .012 250)" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif">05-04</text>
+        <text x="180" y="148" font-size="9" fill="oklch(54% .012 250)" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif">05-05</text>
+        <text x="260" y="148" font-size="9" fill="oklch(54% .012 250)" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif">05-06</text>
+        <text x="340" y="148" font-size="9" fill="oklch(54% .012 250)" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif">05-07</text>
+        <text x="420" y="148" font-size="9" fill="oklch(54% .012 250)" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif">05-08</text>
+        <text x="500" y="148" font-size="9" fill="oklch(18% .012 250)" text-anchor="middle" font-family="-apple-system,system-ui,sans-serif" font-weight="600">今日</text>
+        <rect x="340" y="8" width="12" height="3" rx="1.5" fill="var(--accent)"/>
+        <text x="356" y="13" font-size="9" fill="oklch(54% .012 250)" font-family="-apple-system,system-ui,sans-serif">成功</text>
+        <rect x="390" y="8" width="12" height="3" rx="1.5" fill="var(--s-err)"/>
+        <text x="406" y="13" font-size="9" fill="oklch(54% .012 250)" font-family="-apple-system,system-ui,sans-serif">失败</text>
+      </svg>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">应用执行排行 Top 5</div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+        <div class="mini-bar-row">
+          <span class="mini-bar-label">财务凭证录入</span>
+          <div class="mini-bar-track"><div class="mini-bar-fill ok" style="width:100%"></div></div>
+          <span class="mini-bar-num">312</span>
+        </div>
+        <div class="mini-bar-row">
+          <span class="mini-bar-label">订单状态同步</span>
+          <div class="mini-bar-track"><div class="mini-bar-fill ok" style="width:82%"></div></div>
+          <span class="mini-bar-num">256</span>
+        </div>
+        <div class="mini-bar-row">
+          <span class="mini-bar-label">ERP 数据同步</span>
+          <div class="mini-bar-track"><div class="mini-bar-fill" style="width:61%"></div></div>
+          <span class="mini-bar-num">189</span>
+        </div>
+        <div class="mini-bar-row">
+          <span class="mini-bar-label">合同信息提取</span>
+          <div class="mini-bar-track"><div class="mini-bar-fill" style="width:45%"></div></div>
+          <span class="mini-bar-num">141</span>
+        </div>
+        <div class="mini-bar-row">
+          <span class="mini-bar-label">月度报表导出</span>
+          <div class="mini-bar-track"><div class="mini-bar-fill err" style="width:28%"></div></div>
+          <span class="mini-bar-num">87</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent executions table -->
+  <div style="padding:0 20px 16px;flex-shrink:0">
+    <div class="chart-card" style="overflow:auto">
+      <div style="display:flex;align-items:center;margin-bottom:10px">
+        <span class="chart-title" style="margin:0;flex:1">最近执行</span>
+        <button class="btn btn-ghost btn-sm" onclick="navigate('executions')">查看全部
+          <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 6.5h6M7 3.5l3 3-3 3"/></svg>
+        </button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr>
+            <th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)">执行 ID</th>
+            <th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)">任务名称</th>
+            <th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)" class="hm">机器人</th>
+            <th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)" class="hm">时长</th>
+            <th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)">状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 8px" class="cmono">EXC-20260509-001</td><td style="padding:7px 8px" class="cp">财务凭证自动录入</td><td style="padding:7px 8px" class="cm hm">财务-机器人01</td><td style="padding:7px 8px" class="cmono hm">2m 34s</td><td style="padding:7px 8px"><span class="pill p-ok"><span class="pdot"></span>成功</span></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 8px" class="cmono">EXC-20260509-002</td><td style="padding:7px 8px" class="cp">订单状态实时同步</td><td style="padding:7px 8px" class="cm hm">销售部-机器人03</td><td style="padding:7px 8px" class="cmono hm">—</td><td style="padding:7px 8px"><span class="pill p-run blink"><span class="pdot"></span>运行中</span></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 8px" class="cmono">EXC-20260508-018</td><td style="padding:7px 8px" class="cp">月度报表自动导出</td><td style="padding:7px 8px" class="cm hm">HR部-机器人02</td><td style="padding:7px 8px" class="cmono hm">1m 12s</td><td style="padding:7px 8px"><span class="pill p-err"><span class="pdot"></span>失败</span></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 8px" class="cmono">EXC-20260509-003</td><td style="padding:7px 8px" class="cp">财务凭证自动录入</td><td style="padding:7px 8px" class="cm hm">财务-机器人01</td><td style="padding:7px 8px" class="cmono hm">1m 52s</td><td style="padding:7px 8px"><span class="pill p-ok"><span class="pdot"></span>成功</span></td></tr>
+          <tr><td style="padding:7px 8px" class="cmono">EXC-20260506-009</td><td style="padding:7px 8px" class="cp">合同信息智能提取</td><td style="padding:7px 8px" class="cm hm">法务部-机器人01</td><td style="padding:7px 8px" class="cmono hm">5m 18s</td><td style="padding:7px 8px"><span class="pill p-ok"><span class="pdot"></span>成功</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ──── PAGE: 调度任务 ──── -->
+<div class="page active" id="page-tasks">
+  <div class="pghdr">
+    <div class="pgtw">
+      <div class="pgtitle">调度任务</div>
+      <div class="pgsub">配置和管理自动化调度任务 · 共 127 条任务</div>
+    </div>
+    <div class="pgacts">
+      <button class="btn btn-pri" onclick="openNewTaskModal()">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6.5 1v11M1 6.5h11"/></svg>
+        新建调度任务
+      </button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="srch">
+      <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><path d="M9.5 9.5l2 2"/></svg>
+      <input type="text" placeholder="搜索任务名称、应用…">
+    </div>
+    <select class="fsel">
+      <option>全部状态</option><option>启用</option><option>停用</option>
+    </select>
+    <select class="fsel">
+      <option>全部优先级</option><option>高</option><option>中</option><option>低</option>
+    </select>
+    <select class="fsel">
+      <option>全部调度方式</option><option>定时调度</option><option>立即触发</option>
+    </select>
+    <div class="tbrgt">
+      <button class="btn btn-ghost btn-sm">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M1 3h11M3 6.5h7M5 10h3"/></svg>
+        更多筛选
+      </button>
+      <button class="btn btn-sec btn-sm">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 11h11"/></svg>
+        导出
+      </button>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox" id="chk-all-tasks" onchange="selectAll(this,'tasks')"></th>
+          <th>任务名称</th>
+          <th class="hm">绑定应用</th>
+          <th class="hm">机器人 / 分组</th>
+          <th>调度方式</th>
+          <th>优先级</th>
+          <th class="hm">最近执行时间</th>
+          <th>执行状态</th>
+          <th>状态</th>
+          <th style="width:180px">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox" class="row-chk-tasks"></td>
+          <td>
+            <div class="cp">财务凭证自动录入</div>
+            <div class="cm" style="font-size:10px">由 张伟 创建</div>
+          </td>
+          <td class="hm"><span class="cm">财务凭证处理 v2.1</span></td>
+          <td class="hm"><span class="cm">财务-机器人01</span></td>
+          <td><span class="cm">定时 每天 09:00</span></td>
+          <td><span class="pill p-hi"><span class="pdot"></span>高</span></td>
+          <td class="hm cmono">05-09 09:02</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>成功</span></td>
+          <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+          <td>
+            <div class="acts">
+              <button class="a t" onclick="openTrigger('财务凭证自动录入')">触发</button>
+              <span class="asep">|</span>
+              <button class="a" onclick="navigate('executions')">记录</button>
+              <span class="asep">|</span>
+              <button class="a">编辑</button>
+              <span class="asep">|</span>
+              <button class="a d">停用</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" class="row-chk-tasks"></td>
+          <td>
+            <div class="cp">订单状态实时同步</div>
+            <div class="cm" style="font-size:10px">由 系统 创建</div>
+          </td>
+          <td class="hm"><span class="cm">订单管理系统同步</span></td>
+          <td class="hm"><span class="cm">销售部-RPA集群</span></td>
+          <td><span class="cm">定时 每30分钟</span></td>
+          <td><span class="pill p-mid"><span class="pdot"></span>中</span></td>
+          <td class="hm cmono">05-09 14:30</td>
+          <td><span class="pill p-run blink"><span class="pdot"></span>运行中</span></td>
+          <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+          <td>
+            <div class="acts">
+              <button class="a t" onclick="showToast('任务运行中，请等待完成后再触发', 'err')">触发</button>
+              <span class="asep">|</span>
+              <button class="a" onclick="navigate('executions')">记录</button>
+              <span class="asep">|</span>
+              <button class="a">编辑</button>
+              <span class="asep">|</span>
+              <button class="a d">停用</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" class="row-chk-tasks"></td>
+          <td>
+            <div class="cp">月度报表自动导出</div>
+            <div class="cm" style="font-size:10px">由 李明 创建</div>
+          </td>
+          <td class="hm"><span class="cm">月报生成器 v1.3</span></td>
+          <td class="hm"><span class="cm">HR部-机器人02</span></td>
+          <td><span class="cm">立即触发</span></td>
+          <td><span class="pill p-lo"><span class="pdot"></span>低</span></td>
+          <td class="hm cmono">05-08 23:05</td>
+          <td><span class="pill p-err"><span class="pdot"></span>失败</span></td>
+          <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+          <td>
+            <div class="acts">
+              <button class="a t" onclick="openTrigger('月度报表自动导出')">触发</button>
+              <span class="asep">|</span>
+              <button class="a" onclick="navigate('executions')">记录</button>
+              <span class="asep">|</span>
+              <button class="a">编辑</button>
+              <span class="asep">|</span>
+              <button class="a d">停用</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" class="row-chk-tasks"></td>
+          <td>
+            <div class="cp" style="color:var(--muted)">员工邮件批量通知</div>
+            <div class="cm" style="font-size:10px">由 赵磊 创建</div>
+          </td>
+          <td class="hm"><span class="cm">邮件通知服务</span></td>
+          <td class="hm"><span class="cm">行政部-机器人01</span></td>
+          <td><span class="cm">定时 每天 18:00</span></td>
+          <td><span class="pill p-lo"><span class="pdot"></span>低</span></td>
+          <td class="hm cmono">—</td>
+          <td><span class="pill p-off"><span class="pdot"></span>未执行</span></td>
+          <td><span class="pill p-dis"><span class="pdot"></span>停用</span></td>
+          <td>
+            <div class="acts">
+              <button class="a" onclick="showToast('任务已停用，请先启用后触发', 'err')">触发</button>
+              <span class="asep">|</span>
+              <button class="a" onclick="navigate('executions')">记录</button>
+              <span class="asep">|</span>
+              <button class="a">编辑</button>
+              <span class="asep">|</span>
+              <button class="a t">启用</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" class="row-chk-tasks"></td>
+          <td>
+            <div class="cp">合同信息智能提取</div>
+            <div class="cm" style="font-size:10px">由 王芳 创建</div>
+          </td>
+          <td class="hm"><span class="cm">合同管理应用 v3.0</span></td>
+          <td class="hm"><span class="cm">法务部-机器人01</span></td>
+          <td><span class="cm">定时 每周一 08:00</span></td>
+          <td><span class="pill p-mid"><span class="pdot"></span>中</span></td>
+          <td class="hm cmono">05-06 08:02</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>成功</span></td>
+          <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+          <td>
+            <div class="acts">
+              <button class="a t" onclick="openTrigger('合同信息智能提取')">触发</button>
+              <span class="asep">|</span>
+              <button class="a" onclick="navigate('executions')">记录</button>
+              <span class="asep">|</span>
+              <button class="a">编辑</button>
+              <span class="asep">|</span>
+              <button class="a d">停用</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" class="row-chk-tasks"></td>
+          <td>
+            <div class="cp">采购订单数据核对</div>
+            <div class="cm" style="font-size:10px">由 刘洋 创建</div>
+          </td>
+          <td class="hm"><span class="cm">采购核对 v1.0</span></td>
+          <td class="hm"><span class="cm">采购部-机器人02</span></td>
+          <td><span class="cm">定时 每天 07:30</span></td>
+          <td><span class="pill p-hi"><span class="pdot"></span>高</span></td>
+          <td class="hm cmono">05-09 07:31</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>成功</span></td>
+          <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+          <td>
+            <div class="acts">
+              <button class="a t" onclick="openTrigger('采购订单数据核对')">触发</button>
+              <span class="asep">|</span>
+              <button class="a" onclick="navigate('executions')">记录</button>
+              <span class="asep">|</span>
+              <button class="a">编辑</button>
+              <span class="asep">|</span>
+              <button class="a d">停用</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" class="row-chk-tasks"></td>
+          <td>
+            <div class="cp">ERP 数据定时同步</div>
+            <div class="cm" style="font-size:10px">由 系统 创建</div>
+          </td>
+          <td class="hm"><span class="cm">ERP 接口同步 v2.0</span></td>
+          <td class="hm"><span class="cm">技术部-机器人03</span></td>
+          <td><span class="cm">定时 每小时</span></td>
+          <td><span class="pill p-lo"><span class="pdot"></span>低</span></td>
+          <td class="hm cmono">05-09 15:00</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>成功</span></td>
+          <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+          <td>
+            <div class="acts">
+              <button class="a t" onclick="openTrigger('ERP 数据定时同步')">触发</button>
+              <span class="asep">|</span>
+              <button class="a" onclick="navigate('executions')">记录</button>
+              <span class="asep">|</span>
+              <button class="a">编辑</button>
+              <span class="asep">|</span>
+              <button class="a d">停用</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pgn">
+    <span class="pgni">共 127 条 · 显示第 1–7 条</span>
+    <button class="pgb" disabled>
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6.5 2L3.5 5l3 3"/></svg>
+    </button>
+    <button class="pgb cur">1</button>
+    <button class="pgb">2</button>
+    <button class="pgb">3</button>
+    <span style="color:var(--muted);font-size:11px">…</span>
+    <button class="pgb">19</button>
+    <button class="pgb">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3.5 2L6.5 5l-3 3"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ──── PAGE: 执行记录 ──── -->
+<div class="page" id="page-executions">
+  <div class="pghdr">
+    <div class="pgtw">
+      <div class="pgtitle">执行记录</div>
+      <div class="pgsub">所有调度任务的执行日志 · 点击行查看详情与日志</div>
+    </div>
+    <div class="pgacts">
+      <button class="btn btn-sec btn-sm">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 11h11"/></svg>
+        导出记录
+      </button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="srch">
+      <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><path d="M9.5 9.5l2 2"/></svg>
+      <input type="text" placeholder="搜索执行ID、任务名称…">
+    </div>
+    <select class="fsel">
+      <option>全部状态</option><option>运行中</option><option>成功</option><option>失败</option><option>已停止</option><option>超时</option>
+    </select>
+    <select class="fsel">
+      <option>全部应用</option><option>财务凭证处理 v2.1</option><option>订单管理系统同步</option><option>月报生成器 v1.3</option>
+    </select>
+    <select class="fsel">
+      <option>触发方式：全部</option><option>手动触发</option><option>定时触发</option>
+    </select>
+    <div class="tbrgt">
+      <span class="sync-info">今日 47 次执行</span>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox" id="chk-all-exec" onchange="selectAll(this,'exec')"></th>
+          <th>执行 ID</th>
+          <th>任务名称</th>
+          <th class="hm">触发应用</th>
+          <th class="hm">执行机器人</th>
+          <th>触发方式</th>
+          <th class="hm">触发时间</th>
+          <th>执行时长</th>
+          <th>状态</th>
+          <th style="width:160px">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr onclick="openExecDetail('001')" style="cursor:pointer">
+          <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk-exec"></td>
+          <td><span class="cmono">EXC-20260509-001</span></td>
+          <td class="cp">财务凭证自动录入</td>
+          <td class="hm cm">财务凭证处理 v2.1</td>
+          <td class="hm cm">财务-机器人01</td>
+          <td><span class="cm">手动</span> · <span class="cm">张伟</span></td>
+          <td class="hm cmono">05-09 09:00:05</td>
+          <td class="cmono">2m 34s</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>成功</span></td>
+          <td>
+            <div class="acts" onclick="event.stopPropagation()">
+              <button class="a" onclick="openExecDetail('001')">详情</button>
+              <span class="asep">|</span>
+              <button class="a">下载日志</button>
+            </div>
+          </td>
+        </tr>
+        <tr onclick="openExecDetail('002')" style="cursor:pointer">
+          <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk-exec"></td>
+          <td><span class="cmono">EXC-20260509-002</span></td>
+          <td class="cp">订单状态实时同步</td>
+          <td class="hm cm">订单管理系统同步</td>
+          <td class="hm cm">销售部-机器人03</td>
+          <td><span class="cm">定时</span> · <span class="cm">系统</span></td>
+          <td class="hm cmono">05-09 14:30:01</td>
+          <td class="cmono">—</td>
+          <td><span class="pill p-run blink"><span class="pdot"></span>运行中</span></td>
+          <td>
+            <div class="acts" onclick="event.stopPropagation()">
+              <button class="a" onclick="openExecDetail('002')">详情</button>
+              <span class="asep">|</span>
+              <button class="a d">停止</button>
+            </div>
+          </td>
+        </tr>
+        <tr onclick="openExecDetail('003')" style="cursor:pointer">
+          <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk-exec"></td>
+          <td><span class="cmono">EXC-20260508-018</span></td>
+          <td class="cp">月度报表自动导出</td>
+          <td class="hm cm">月报生成器 v1.3</td>
+          <td class="hm cm">HR部-机器人02</td>
+          <td><span class="cm">手动</span> · <span class="cm">李明</span></td>
+          <td class="hm cmono">05-08 23:05:02</td>
+          <td class="cmono">1m 12s</td>
+          <td><span class="pill p-err"><span class="pdot"></span>失败</span></td>
+          <td>
+            <div class="acts" onclick="event.stopPropagation()">
+              <button class="a" onclick="openExecDetail('003')">详情</button>
+              <span class="asep">|</span>
+              <button class="a t">重试</button>
+            </div>
+          </td>
+        </tr>
+        <tr onclick="openExecDetail('001')" style="cursor:pointer">
+          <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk-exec"></td>
+          <td><span class="cmono">EXC-20260509-003</span></td>
+          <td class="cp">财务凭证自动录入</td>
+          <td class="hm cm">财务凭证处理 v2.1</td>
+          <td class="hm cm">财务-机器人01</td>
+          <td><span class="cm">定时</span> · <span class="cm">系统</span></td>
+          <td class="hm cmono">05-09 09:00:02</td>
+          <td class="cmono">1m 52s</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>成功</span></td>
+          <td>
+            <div class="acts" onclick="event.stopPropagation()">
+              <button class="a" onclick="openExecDetail('001')">详情</button>
+              <span class="asep">|</span>
+              <button class="a">下载日志</button>
+            </div>
+          </td>
+        </tr>
+        <tr onclick="openExecDetail('001')" style="cursor:pointer">
+          <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk-exec"></td>
+          <td><span class="cmono">EXC-20260506-009</span></td>
+          <td class="cp">合同信息智能提取</td>
+          <td class="hm cm">合同管理应用 v3.0</td>
+          <td class="hm cm">法务部-机器人01</td>
+          <td><span class="cm">手动</span> · <span class="cm">王芳</span></td>
+          <td class="hm cmono">05-06 08:02:17</td>
+          <td class="cmono">5m 18s</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>成功</span></td>
+          <td>
+            <div class="acts" onclick="event.stopPropagation()">
+              <button class="a">详情</button>
+              <span class="asep">|</span>
+              <button class="a">下载日志</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pgn">
+    <span class="pgni">共 1,284 条 · 显示第 1–5 条</span>
+    <button class="pgb" disabled>
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6.5 2L3.5 5l3 3"/></svg>
+    </button>
+    <button class="pgb cur">1</button>
+    <button class="pgb">2</button>
+    <button class="pgb">3</button>
+    <span style="color:var(--muted);font-size:11px">…</span>
+    <button class="pgb">257</button>
+    <button class="pgb">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3.5 2L6.5 5l-3 3"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ──── PAGE: 机器人管理 ──── -->
+<div class="page" id="page-robots">
+  <div class="pghdr">
+    <div class="pgtw">
+      <div class="pgtitle">机器人管理</div>
+      <div class="pgsub">执行客户端状态与归属管理 · 每5分钟自动同步</div>
+    </div>
+    <div class="pgacts">
+      <button class="btn btn-sec btn-sm" id="syncRobotBtn" onclick="startSync('robot')">
+        <svg id="syncRobotIco" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 6.5A4.5 4.5 0 112 6.5"/><path d="M11 2v4.5H6.5"/></svg>
+        手动同步
+      </button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="srch">
+      <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><path d="M9.5 9.5l2 2"/></svg>
+      <input type="text" placeholder="搜索机器人名称、IP…">
+    </div>
+    <select class="fsel">
+      <option>全部状态</option><option>在线</option><option>离线</option><option>忙碌</option>
+    </select>
+    <select class="fsel">
+      <option>全部分组</option><option>财务自动化组</option><option>销售自动化组</option><option>HR自动化组</option>
+    </select>
+    <select class="fsel">
+      <option>全部租户</option><option>华东子公司</option><option>华北子公司</option><option>华南子公司</option><option>总部</option>
+    </select>
+    <div class="tbrgt">
+      <span class="sync-info" id="syncRobotInfo">最后同步: 15:42:03</span>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox"></th>
+          <th>机器人名称</th>
+          <th class="hm">关联账号</th>
+          <th class="hm">所属分组</th>
+          <th class="hm">归属租户</th>
+          <th>归属部门</th>
+          <th>状态</th>
+          <th class="hm">当前运行应用</th>
+          <th>最后心跳</th>
+          <th style="width:100px">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">财务-机器人01</div>
+            <div class="cmono" style="font-size:10px;margin-top:2px">192.168.1.101</div>
+          </td>
+          <td class="hm cmono">zhang.wei</td>
+          <td class="hm cm">财务自动化组</td>
+          <td class="hm cm">华东子公司</td>
+          <td class="cm">财务部</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>在线</span></td>
+          <td class="hm cm">—</td>
+          <td class="cmono">15:42:03</td>
+          <td><div class="acts"><button class="a">详情</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">销售部-机器人03</div>
+            <div class="cmono" style="font-size:10px;margin-top:2px">192.168.3.22</div>
+          </td>
+          <td class="hm cmono">li.ming</td>
+          <td class="hm cm">销售自动化组</td>
+          <td class="hm cm">华东子公司</td>
+          <td class="cm">销售部</td>
+          <td><span class="pill p-run blink"><span class="pdot"></span>忙碌</span></td>
+          <td class="hm" style="font-size:11px;color:var(--s-run)">订单管理系统同步</td>
+          <td class="cmono">15:41:58</td>
+          <td><div class="acts"><button class="a">详情</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp" style="color:var(--muted)">HR部-机器人02</div>
+            <div class="cmono" style="font-size:10px;margin-top:2px;color:var(--s-err)">192.168.2.35</div>
+          </td>
+          <td class="hm cmono">wang.fang</td>
+          <td class="hm cm">HR自动化组</td>
+          <td class="hm cm">华北子公司</td>
+          <td class="cm">人事部</td>
+          <td><span class="pill p-off"><span class="pdot"></span>离线</span></td>
+          <td class="hm cm">—</td>
+          <td class="cmono" style="color:var(--s-err)">08:15:42</td>
+          <td><div class="acts"><button class="a">详情</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">行政部-机器人01</div>
+            <div class="cmono" style="font-size:10px;margin-top:2px">192.168.4.88</div>
+          </td>
+          <td class="hm cmono">zhao.lei</td>
+          <td class="hm cm">行政自动化组</td>
+          <td class="hm cm">华北子公司</td>
+          <td class="cm">行政部</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>在线</span></td>
+          <td class="hm cm">—</td>
+          <td class="cmono">15:40:11</td>
+          <td><div class="acts"><button class="a">详情</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">法务部-机器人01</div>
+            <div class="cmono" style="font-size:10px;margin-top:2px">192.168.5.14</div>
+          </td>
+          <td class="hm cmono">chen.jing</td>
+          <td class="hm cm">法务自动化组</td>
+          <td class="hm cm">总部</td>
+          <td class="cm">法务部</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>在线</span></td>
+          <td class="hm cm">—</td>
+          <td class="cmono">15:38:55</td>
+          <td><div class="acts"><button class="a">详情</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">采购部-机器人02</div>
+            <div class="cmono" style="font-size:10px;margin-top:2px">192.168.6.201</div>
+          </td>
+          <td class="hm cmono">liu.yang</td>
+          <td class="hm cm">采购自动化组</td>
+          <td class="hm cm">华南子公司</td>
+          <td class="cm">采购部</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>在线</span></td>
+          <td class="hm cm">—</td>
+          <td class="cmono">15:36:29</td>
+          <td><div class="acts"><button class="a">详情</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pgn">
+    <span class="pgni">共 24 台 · 在线 18 / 离线 4 / 忙碌 2</span>
+    <button class="pgb" disabled>
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6.5 2L3.5 5l3 3"/></svg>
+    </button>
+    <button class="pgb cur">1</button>
+    <button class="pgb">2</button>
+    <button class="pgb">3</button>
+    <button class="pgb">4</button>
+    <button class="pgb">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3.5 2L6.5 5l-3 3"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ──── PAGE: 账号管理 ──── -->
+<div class="page" id="page-accounts">
+  <div class="pghdr">
+    <div class="pgtw">
+      <div class="pgtitle">账号管理</div>
+      <div class="pgsub">系统账号同步、角色分配与租户部门关联</div>
+    </div>
+    <div class="pgacts">
+      <button class="btn btn-sec btn-sm" id="syncAccBtn" onclick="startSync('account')">
+        <svg id="syncAccIco" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 6.5A4.5 4.5 0 112 6.5"/><path d="M11 2v4.5H6.5"/></svg>
+        手动同步
+      </button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="srch">
+      <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><path d="M9.5 9.5l2 2"/></svg>
+      <input type="text" placeholder="搜索账号名称、登录账号…">
+    </div>
+    <select class="fsel">
+      <option>全部角色</option><option>超级管理员</option><option>租户管理员</option><option>员工</option>
+    </select>
+    <select class="fsel">
+      <option>全部租户</option><option>华东子公司</option><option>华北子公司</option><option>华南子公司</option><option>总部</option><option>未分配</option>
+    </select>
+    <select class="fsel">
+      <option>全部状态</option><option>正常</option><option>已失效</option>
+    </select>
+    <div class="tbrgt">
+      <span class="sync-info" id="syncAccInfo">最后同步: 14:00:12</span>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox"></th>
+          <th>账号名称</th>
+          <th>登录账号</th>
+          <th class="hm">归属租户</th>
+          <th class="hm">归属部门</th>
+          <th>Console 角色</th>
+          <th class="hm">标签</th>
+          <th>状态</th>
+          <th style="width:180px">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">张伟</div>
+            <div class="cm" style="font-size:10px">138****8001</div>
+          </td>
+          <td class="cmono">zhang.wei</td>
+          <td class="hm cm">华东子公司</td>
+          <td class="hm cm">财务部</td>
+          <td><span class="pill p-mb"><span class="pdot"></span>员工</span></td>
+          <td class="hm">
+            <div class="tags">
+              <span class="tag tg">财务</span>
+              <span class="tag to">审计</span>
+            </div>
+          </td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td>
+            <div class="acts">
+              <button class="a">关联租户</button>
+              <span class="asep">|</span>
+              <button class="a">设置角色</button>
+              <span class="asep">|</span>
+              <button class="a">标签</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">李明</div>
+            <div class="cm" style="font-size:10px">139****0042</div>
+          </td>
+          <td class="cmono">li.ming</td>
+          <td class="hm cm">华东子公司</td>
+          <td class="hm cm">—</td>
+          <td><span class="pill p-ta"><span class="pdot"></span>租户管理员</span></td>
+          <td class="hm">
+            <div class="tags"><span class="tag">销售</span></div>
+          </td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td>
+            <div class="acts">
+              <button class="a">关联租户</button>
+              <span class="asep">|</span>
+              <button class="a">设置角色</button>
+              <span class="asep">|</span>
+              <button class="a">标签</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">王芳</div>
+            <div class="cm" style="font-size:10px">137****5509</div>
+          </td>
+          <td class="cmono">wang.fang</td>
+          <td class="hm cm">华北子公司</td>
+          <td class="hm cm">人事部</td>
+          <td><span class="pill p-mb"><span class="pdot"></span>员工</span></td>
+          <td class="hm">
+            <div class="tags"><span class="tag tg">HR</span></div>
+          </td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td>
+            <div class="acts">
+              <button class="a">关联租户</button>
+              <span class="asep">|</span>
+              <button class="a">设置角色</button>
+              <span class="asep">|</span>
+              <button class="a">标签</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">超级管理员</div>
+            <div class="cm" style="font-size:10px">系统账号</div>
+          </td>
+          <td class="cmono">superadmin</td>
+          <td class="hm cm">—</td>
+          <td class="hm cm">—</td>
+          <td><span class="pill p-sa"><span class="pdot"></span>超级管理员</span></td>
+          <td class="hm"><div class="tags"></div></td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td>
+            <div class="acts">
+              <button class="a" onclick="showToast('超级管理员账号无需关联租户', 'err')">关联租户</button>
+              <span class="asep">|</span>
+              <button class="a">详情</button>
+            </div>
+          </td>
+        </tr>
+        <tr style="opacity:.65">
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp" style="color:var(--muted)">陈静</div>
+            <div class="cm" style="font-size:10px">135****7731</div>
+          </td>
+          <td class="cmono">chen.jing</td>
+          <td class="hm cm">总部</td>
+          <td class="hm cm">法务部</td>
+          <td><span class="pill p-mb"><span class="pdot"></span>员工</span></td>
+          <td class="hm">
+            <div class="tags">
+              <span class="tag tgr">法务</span>
+              <span class="tag tgr">合规</span>
+            </div>
+          </td>
+          <td><span class="pill p-err"><span class="pdot"></span>已失效</span></td>
+          <td>
+            <div class="acts">
+              <button class="a">详情</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">赵磊</div>
+            <div class="cm" style="font-size:10px">136****2214</div>
+          </td>
+          <td class="cmono">zhao.lei</td>
+          <td class="hm cm">华北子公司</td>
+          <td class="hm cm">行政部</td>
+          <td><span class="pill p-mb"><span class="pdot"></span>员工</span></td>
+          <td class="hm">
+            <div class="tags"><span class="tag to">行政</span></div>
+          </td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td>
+            <div class="acts">
+              <button class="a">关联租户</button>
+              <span class="asep">|</span>
+              <button class="a">设置角色</button>
+              <span class="asep">|</span>
+              <button class="a">标签</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>
+            <div class="cp">刘洋</div>
+            <div class="cm" style="font-size:10px">180****8803</div>
+          </td>
+          <td class="cmono">liu.yang</td>
+          <td class="hm cm">华南子公司</td>
+          <td class="hm cm">采购部</td>
+          <td><span class="pill p-mb"><span class="pdot"></span>员工</span></td>
+          <td class="hm">
+            <div class="tags"><span class="tag tg">采购</span></div>
+          </td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td>
+            <div class="acts">
+              <button class="a">关联租户</button>
+              <span class="asep">|</span>
+              <button class="a">设置角色</button>
+              <span class="asep">|</span>
+              <button class="a">标签</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pgn">
+    <span class="pgni">共 89 条 · 显示第 1–7 条</span>
+    <button class="pgb" disabled>
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6.5 2L3.5 5l3 3"/></svg>
+    </button>
+    <button class="pgb cur">1</button>
+    <button class="pgb">2</button>
+    <button class="pgb">3</button>
+    <span style="color:var(--muted);font-size:11px">…</span>
+    <button class="pgb">13</button>
+    <button class="pgb">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3.5 2L6.5 5l-3 3"/></svg>
+    </button>
+  </div>
+</div>
+
+
+<!-- ──── PAGE: RPA 应用管理 ──── -->
+<div class="page" id="page-apps">
+  <div class="pghdr">
+    <div class="pgtw">
+      <div class="pgtitle">RPA 应用</div>
+      <div class="pgsub">同步影刀侧 RPA 应用，关联租户/部门后可在调度任务中使用</div>
+    </div>
+    <div class="pgacts">
+      <button class="btn btn-sec btn-sm" id="syncAppsBtn" onclick="startSyncApps()">
+        <svg id="syncAppsIco" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 6.5A4.5 4.5 0 112 6.5"/><path d="M11 2v4.5H6.5"/></svg>
+        手动同步
+      </button>
+    </div>
+  </div>
+  <div class="toolbar">
+    <div class="srch">
+      <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><path d="M9.5 9.5l2 2"/></svg>
+      <input type="text" placeholder="搜索应用名称…">
+    </div>
+    <select class="fsel"><option>全部租户</option><option>华东子公司</option><option>华北子公司</option><option>总部</option></select>
+    <select class="fsel"><option>全部状态</option><option>正常</option><option>已失效</option></select>
+    <select class="fsel"><option>支持参数：全部</option><option>支持参数</option><option>不支持参数</option></select>
+    <div class="tbrgt"><span class="sync-info" id="syncAppsInfo">最后同步: 14:05:32</span></div>
+  </div>
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox"></th>
+          <th>应用名称</th>
+          <th class="hm">应用版本</th>
+          <th class="hm">所有者</th>
+          <th>归属租户</th>
+          <th class="hm">归属部门</th>
+          <th>支持参数</th>
+          <th class="hm">标签</th>
+          <th>状态</th>
+          <th style="width:160px">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><div class="cp">财务凭证处理</div><div class="cmono" style="font-size:10px;margin-top:2px">app-uuid-f001</div></td>
+          <td class="hm cm">v2.1</td>
+          <td class="hm cmono">zhang.wei</td>
+          <td class="cm">华东子公司</td>
+          <td class="hm cm">财务部</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>支持</span></td>
+          <td class="hm"><div class="tags"><span class="tag tg">财务</span></div></td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td><div class="acts"><button class="a">关联租户</button><span class="asep">|</span><button class="a">查看参数</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><div class="cp">订单管理系统同步</div><div class="cmono" style="font-size:10px;margin-top:2px">app-uuid-s002</div></td>
+          <td class="hm cm">v1.5</td>
+          <td class="hm cmono">li.ming</td>
+          <td class="cm">华东子公司</td>
+          <td class="hm cm">销售部</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>支持</span></td>
+          <td class="hm"><div class="tags"><span class="tag">销售</span></div></td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td><div class="acts"><button class="a">关联租户</button><span class="asep">|</span><button class="a">查看参数</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><div class="cp">月报生成器</div><div class="cmono" style="font-size:10px;margin-top:2px">app-uuid-r003</div></td>
+          <td class="hm cm">v1.3</td>
+          <td class="hm cmono">wang.fang</td>
+          <td class="cm">华北子公司</td>
+          <td class="hm cm">人事部</td>
+          <td><span class="pill p-ok"><span class="pdot"></span>支持</span></td>
+          <td class="hm"><div class="tags"><span class="tag tg">HR</span></div></td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td><div class="acts"><button class="a">关联租户</button><span class="asep">|</span><button class="a">查看参数</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><div class="cp">合同管理应用</div><div class="cmono" style="font-size:10px;margin-top:2px">app-uuid-c004</div></td>
+          <td class="hm cm">v3.0</td>
+          <td class="hm cmono">chen.jing</td>
+          <td class="cm">总部</td>
+          <td class="hm cm">法务部</td>
+          <td><span class="pill p-off"><span class="pdot"></span>不支持</span></td>
+          <td class="hm"><div class="tags"><span class="tag tgr">法务</span></div></td>
+          <td><span class="pill p-ok"><span class="pdot"></span>正常</span></td>
+          <td><div class="acts"><button class="a">关联租户</button><span class="asep">|</span><button class="a">查看参数</button><span class="asep">|</span><button class="a">标签</button></div></td>
+        </tr>
+        <tr style="opacity:.65">
+          <td><input type="checkbox"></td>
+          <td><div class="cp" style="color:var(--muted)">旧版邮件通知</div><div class="cmono" style="font-size:10px;margin-top:2px">app-uuid-e005</div></td>
+          <td class="hm cm">v0.9</td>
+          <td class="hm cmono">zhao.lei</td>
+          <td class="cm">—</td>
+          <td class="hm cm">—</td>
+          <td><span class="pill p-off"><span class="pdot"></span>不支持</span></td>
+          <td class="hm"><div class="tags"></div></td>
+          <td><span class="pill p-err"><span class="pdot"></span>已失效</span></td>
+          <td><div class="acts"><button class="a">查看参数</button></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pgn"><span class="pgni">共 18 个应用 · 显示第 1–5 条</span></div>
+</div>
+
+<!-- ──── PAGE: 标签管理 ──── -->
+<div class="page" id="page-tags">
+  <div class="pghdr">
+    <div class="pgtw">
+      <div class="pgtitle">标签管理</div>
+      <div class="pgsub">用于对账号、应用、机器人、调度任务分类标注 · 按租户隔离</div>
+    </div>
+    <div class="pgacts">
+      <button class="btn btn-pri" onclick="openModal('newTagMov')">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6.5 1v11M1 6.5h11"/></svg>
+        新建标签
+      </button>
+    </div>
+  </div>
+  <div class="toolbar">
+    <div class="srch">
+      <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><path d="M9.5 9.5l2 2"/></svg>
+      <input type="text" placeholder="搜索标签名称…">
+    </div>
+    <select class="fsel"><option>全部租户</option><option>华东子公司</option><option>华北子公司</option><option>总部</option></select>
+  </div>
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox"></th>
+          <th style="width:100px">标签</th>
+          <th>标签名称</th>
+          <th class="hm">关联账号</th>
+          <th class="hm">关联应用</th>
+          <th class="hm">关联机器人</th>
+          <th class="hm">关联任务</th>
+          <th class="hm">创建人</th>
+          <th class="hm">创建时间</th>
+          <th style="width:100px">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><span class="tag tg" style="padding:3px 10px;font-size:11px">财务</span></td>
+          <td class="cp">财务</td>
+          <td class="hm cmono" style="font-variant-numeric:tabular-nums">4</td>
+          <td class="hm cmono">2</td>
+          <td class="hm cmono">3</td>
+          <td class="hm cmono">5</td>
+          <td class="hm cm">张伟</td>
+          <td class="hm cmono">2026-01-15</td>
+          <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d">删除</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><span class="tag to" style="padding:3px 10px;font-size:11px">审计</span></td>
+          <td class="cp">审计</td>
+          <td class="hm cmono">2</td>
+          <td class="hm cmono">0</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">2</td>
+          <td class="hm cm">张伟</td>
+          <td class="hm cmono">2026-01-15</td>
+          <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d">删除</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><span class="tag" style="padding:3px 10px;font-size:11px">销售</span></td>
+          <td class="cp">销售</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">2</td>
+          <td class="hm cmono">3</td>
+          <td class="hm cm">李明</td>
+          <td class="hm cmono">2026-02-08</td>
+          <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d">删除</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><span class="tag tg" style="padding:3px 10px;font-size:11px;background:var(--s-run-bg);color:var(--s-run)">HR</span></td>
+          <td class="cp">HR</td>
+          <td class="hm cmono">2</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">2</td>
+          <td class="hm cm">王芳</td>
+          <td class="hm cmono">2026-02-20</td>
+          <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d">删除</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><span class="tag tgr" style="padding:3px 10px;font-size:11px">法务</span></td>
+          <td class="cp">法务</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">0</td>
+          <td class="hm cm">陈静</td>
+          <td class="hm cmono">2026-03-01</td>
+          <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d" onclick="showToast('法务标签已关联 3 个资源，删除将自动解除所有关联', '')">删除</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><span class="tag to" style="padding:3px 10px;font-size:11px">采购</span></td>
+          <td class="cp">采购</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">0</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cmono">1</td>
+          <td class="hm cm">刘洋</td>
+          <td class="hm cmono">2026-03-12</td>
+          <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d">删除</button></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pgn"><span class="pgni">共 6 个标签 · 华东子公司视角</span></div>
+</div>
+
+<!-- ──── PAGE: 组织管理（租户 + 部门 Tab） ──── -->
+<div class="page" id="page-tenants">
+  <div class="pghdr">
+    <div class="pgtw">
+      <div class="pgtitle">组织管理</div>
+      <div class="pgsub">租户（子公司）和部门的全生命周期管理 · 超级管理员专属</div>
+    </div>
+    <div class="pgacts" id="tenantTabActs">
+      <button class="btn btn-pri" onclick="openModal('newTenantMov')">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6.5 1v11M1 6.5h11"/></svg>
+        新建租户
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab strip -->
+  <div style="padding:8px 20px 0;display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0">
+    <button class="tab-btn active" id="tab-tenant" onclick="switchOrgTab('tenant')">租户管理</button>
+    <button class="tab-btn" id="tab-dept" onclick="switchOrgTab('dept')">部门管理</button>
+  </div>
+
+  <!-- Tenant sub-view -->
+  <div id="org-tenant" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+    <div class="toolbar">
+      <div class="srch"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><path d="M9.5 9.5l2 2"/></svg><input type="text" placeholder="搜索租户名称…"></div>
+      <select class="fsel"><option>全部状态</option><option>启用</option><option>停用</option></select>
+    </div>
+    <div class="tblwrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px"><input type="checkbox"></th>
+            <th>租户名称</th>
+            <th class="hm">租户 ID</th>
+            <th>租户管理员</th>
+            <th>部门数</th>
+            <th>账号数</th>
+            <th class="hm">创建时间</th>
+            <th>状态</th>
+            <th style="width:160px">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><div class="cp">华东子公司</div><div class="cm" style="font-size:10px">制造业事业群</div></td>
+            <td class="hm cmono">tenant-001</td>
+            <td class="cm">李明</td>
+            <td class="cmono">4</td>
+            <td class="cmono">23</td>
+            <td class="hm cmono">2026-01-10</td>
+            <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+            <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a" onclick="switchOrgTab('dept')">查看部门</button><span class="asep">|</span><button class="a d">停用</button></div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><div class="cp">华北子公司</div><div class="cm" style="font-size:10px">政务数字化事业群</div></td>
+            <td class="hm cmono">tenant-002</td>
+            <td class="cm">王芳</td>
+            <td class="cmono">3</td>
+            <td class="cmono">18</td>
+            <td class="hm cmono">2026-01-15</td>
+            <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+            <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a" onclick="switchOrgTab('dept')">查看部门</button><span class="asep">|</span><button class="a d">停用</button></div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><div class="cp">华南子公司</div><div class="cm" style="font-size:10px">供应链事业群</div></td>
+            <td class="hm cmono">tenant-003</td>
+            <td class="cm">刘洋</td>
+            <td class="cmono">2</td>
+            <td class="cmono">11</td>
+            <td class="hm cmono">2026-02-01</td>
+            <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+            <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a" onclick="switchOrgTab('dept')">查看部门</button><span class="asep">|</span><button class="a d">停用</button></div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><div class="cp">总部</div><div class="cm" style="font-size:10px">集团总部</div></td>
+            <td class="hm cmono">tenant-000</td>
+            <td class="cm">超级管理员</td>
+            <td class="cmono">2</td>
+            <td class="cmono">5</td>
+            <td class="hm cmono">2026-01-01</td>
+            <td><span class="pill p-en"><span class="pdot"></span>启用</span></td>
+            <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a" onclick="switchOrgTab('dept')">查看部门</button></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pgn"><span class="pgni">共 4 个租户</span></div>
+  </div>
+
+  <!-- Dept sub-view -->
+  <div id="org-dept" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+    <div class="toolbar">
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--accent-l);border-radius:var(--r);font-size:11px;color:var(--accent)">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1" y="3" width="9" height="7" rx=".7"/><path d="M3.5 3V2a2 2 0 014 0v1"/></svg>
+        华东子公司
+      </div>
+      <div class="srch"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><path d="M9.5 9.5l2 2"/></svg><input type="text" placeholder="搜索部门名称…"></div>
+      <div class="tbrgt"><button class="btn btn-pri btn-sm" onclick="openModal('newDeptMov')"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6.5 1v11M1 6.5h11"/></svg>新建部门</button></div>
+    </div>
+    <div class="tblwrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px"><input type="checkbox"></th>
+            <th>部门名称</th>
+            <th class="hm">部门 ID</th>
+            <th>账号数量</th>
+            <th class="hm">部门描述</th>
+            <th class="hm">创建时间</th>
+            <th style="width:120px">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td class="cp">财务部</td>
+            <td class="hm cmono">dept-t001-001</td>
+            <td class="cmono">8</td>
+            <td class="hm cm">财务凭证录入与报表自动化</td>
+            <td class="hm cmono">2026-01-10</td>
+            <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d" onclick="showToast('部门下存在 8 个账号，请先将账号移出后再删除', 'err')">删除</button></div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td class="cp">销售部</td>
+            <td class="hm cmono">dept-t001-002</td>
+            <td class="cmono">6</td>
+            <td class="hm cm">订单同步与客户数据自动化</td>
+            <td class="hm cmono">2026-01-10</td>
+            <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d">删除</button></div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td class="cp">采购部</td>
+            <td class="hm cmono">dept-t001-003</td>
+            <td class="cmono">5</td>
+            <td class="hm cm">采购订单核对与供应商数据同步</td>
+            <td class="hm cmono">2026-02-05</td>
+            <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d">删除</button></div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td class="cp">行政部</td>
+            <td class="hm cmono">dept-t001-004</td>
+            <td class="cmono">4</td>
+            <td class="hm cm">行政通知与档案管理自动化</td>
+            <td class="hm cmono">2026-02-20</td>
+            <td><div class="acts"><button class="a">编辑</button><span class="asep">|</span><button class="a d">删除</button></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pgn"><span class="pgni">共 4 个部门 · 华东子公司</span></div>
+  </div>
+</div>
+
+<!-- ──── PAGE: 角色权限 ──── -->
+<div class="page" id="page-roles">
+  <div class="pghdr">
+    <div class="pgtw">
+      <div class="pgtitle">角色权限</div>
+      <div class="pgsub">系统预设 3 级角色，权限逐层缩小，不可自定义</div>
+    </div>
+  </div>
+  <div style="padding:16px 20px;flex:1;overflow:auto">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:960px">
+      <!-- Super Admin -->
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <div style="width:32px;height:32px;border-radius:50%;background:#5b21b6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">超</div>
+          <div>
+            <div style="font-size:13px;font-weight:600">超级管理员</div>
+            <div style="font-size:10px;color:var(--muted)">Super Admin · 不归属任何租户</div>
+          </div>
+          <span class="pill p-sa" style="margin-left:auto">全局</span>
+        </div>
+        <div style="padding:14px 16px">
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">权限范围</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 管理所有租户（新建/停用）</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 将账号关联到任意租户</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 将 RPA 应用关联到任意租户</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 查看全部租户全部数据</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 可切换任意租户视角</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 同步账号/应用/机器人</div>
+          </div>
+        </div>
+      </div>
+      <!-- Tenant Admin -->
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">租</div>
+          <div>
+            <div style="font-size:13px;font-weight:600">租户管理员</div>
+            <div style="font-size:10px;color:var(--muted)">Tenant Admin · 归属某一租户</div>
+          </div>
+          <span class="pill p-ta" style="margin-left:auto">租户</span>
+        </div>
+        <div style="padding:14px 16px">
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">权限范围</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 本租户下新建/管理部门</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 将账号关联到本租户部门</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 将 RPA 应用分配到本租户部门</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 管理本租户标签</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 查看本租户全部数据</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-warn)">~</span> 不能操作其他租户数据</div>
+          </div>
+        </div>
+      </div>
+      <!-- Member -->
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--fg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">员</div>
+          <div>
+            <div style="font-size:13px;font-weight:600">员工</div>
+            <div style="font-size:10px;color:var(--muted)">Member · 归属某租户/某部门</div>
+          </div>
+          <span class="pill p-mb" style="margin-left:auto">部门</span>
+        </div>
+        <div style="padding:14px 16px">
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">权限范围</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 查看本部门的账号/应用/机器人</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 配置本部门范围的调度任务</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-ok)">✓</span> 给资源打标签（本租户标签）</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-err)">✗</span> 不能管理组织/账号/角色</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-err)">✗</span> 不能查看跨部门数据</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--s-warn)">~</span> 挂租户层时可见租户全量数据</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;max-width:960px">
+      <div style="font-size:12px;font-weight:600;color:var(--fg);margin-bottom:10px">权限矩阵</div>
+      <table style="border:1px solid var(--border);border-radius:6px;overflow:hidden;width:100%;font-size:11px">
+        <thead>
+          <tr style="background:var(--bg)">
+            <th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600">功能</th>
+            <th style="padding:8px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600">超级管理员</th>
+            <th style="padding:8px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600">租户管理员</th>
+            <th style="padding:8px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600">员工</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px;color:var(--fg)">管理租户</td><td style="text-align:center;color:var(--s-ok)">✓</td><td style="text-align:center;color:var(--s-err)">✗</td><td style="text-align:center;color:var(--s-err)">✗</td></tr>
+          <tr style="border-bottom:1px solid var(--border);background:var(--bg)"><td style="padding:7px 12px;color:var(--fg)">管理部门</td><td style="text-align:center;color:var(--s-warn)">查看</td><td style="text-align:center;color:var(--s-ok)">✓（本租户）</td><td style="text-align:center;color:var(--s-err)">✗</td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px;color:var(--fg)">关联账号到租户</td><td style="text-align:center;color:var(--s-ok)">✓</td><td style="text-align:center;color:var(--s-err)">✗</td><td style="text-align:center;color:var(--s-err)">✗</td></tr>
+          <tr style="border-bottom:1px solid var(--border);background:var(--bg)"><td style="padding:7px 12px;color:var(--fg)">分配账号到部门</td><td style="text-align:center;color:var(--s-err)">✗</td><td style="text-align:center;color:var(--s-ok)">✓（本租户）</td><td style="text-align:center;color:var(--s-err)">✗</td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 12px;color:var(--fg)">管理调度任务</td><td style="text-align:center;color:var(--s-ok)">✓（全局）</td><td style="text-align:center;color:var(--s-ok)">✓（本租户）</td><td style="text-align:center;color:var(--s-ok)">✓（本部门）</td></tr>
+          <tr style="border-bottom:1px solid var(--border);background:var(--bg)"><td style="padding:7px 12px;color:var(--fg)">管理标签</td><td style="text-align:center;color:var(--s-warn)">查看</td><td style="text-align:center;color:var(--s-ok)">✓（本租户）</td><td style="text-align:center;color:var(--s-warn)">打标</td></tr>
+          <tr><td style="padding:7px 12px;color:var(--fg)">同步账号/应用/机器人</td><td style="text-align:center;color:var(--s-ok)">✓</td><td style="text-align:center;color:var(--s-err)">✗</td><td style="text-align:center;color:var(--s-err)">✗</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ──── PAGE: 排班看板 ──── -->
+<div class="page" id="page-board">
+  <div class="pghdr">
+    <div class="pgtw">
+      <div class="pgtitle">排班看板</div>
+      <div class="pgsub">机器人调度时间轴 · 2026-05-09</div>
+    </div>
+    <div class="pgacts">
+      <select class="fsel"><option>今天</option><option>本周</option><option>自定义</option></select>
+      <select class="fsel"><option>全部租户</option><option>华东子公司</option><option>华北子公司</option><option>华南子公司</option><option>总部</option></select>
+    </div>
+  </div>
+  <div style="flex:1;overflow:auto;padding:16px 20px">
+    <div style="min-width:900px">
+      <!-- Header row -->
+      <div style="display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:4px;position:sticky;top:0;background:var(--bg);z-index:2">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:0 0 0 4px">机器人</div>
+        <div style="display:grid;grid-template-columns:repeat(24,1fr)">
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">00</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">01</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">02</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">03</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">04</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">05</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">06</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">07</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">08</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">09</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">10</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">11</span>
+          <span style="font-size:9px;color:var(--s-warn);text-align:center;font-family:var(--fm);font-weight:600">12</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">13</span>
+          <span style="font-size:9px;color:var(--fg);text-align:center;font-family:var(--fm);font-weight:700">14</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">15</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">16</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">17</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">18</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">19</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">20</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">21</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">22</span>
+          <span style="font-size:9px;color:var(--muted);text-align:center;font-family:var(--fm)">23</span>
+        </div>
+      </div>
+
+      <!-- "Now" indicator overlay -->
+      <div style="position:relative">
+        <!-- Current time line at ~14:30 = 60.4% of day -->
+        <div style="position:absolute;left:calc(160px + (100% - 160px) * 0.604);top:0;bottom:0;width:1.5px;background:var(--accent);opacity:.7;z-index:3;pointer-events:none">
+          <div style="position:absolute;top:-3px;left:-3px;width:7px;height:7px;border-radius:50%;background:var(--accent)"></div>
+          <div style="position:absolute;top:-16px;left:6px;font-size:9px;color:var(--accent);font-family:var(--fm);white-space:nowrap;font-weight:600">14:30 现在</div>
+        </div>
+
+        <!-- Robot rows generated by JS -->
+        <div id="boardRows"></div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div style="display:flex;gap:16px;margin-top:16px;font-size:10px;color:var(--muted);flex-wrap:wrap">
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--s-ok);display:inline-block"></span>成功</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--s-run);display:inline-block"></span>运行中</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--s-err);display:inline-block"></span>失败</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--s-warn);display:inline-block"></span>已停止</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:transparent;border:1px dashed var(--muted);display:inline-block"></span>排期中</span>
+    </div>
+  </div>
+</div>
+
+</main>
+</div><!-- .app -->
+
+<!-- ═══════════ EXECUTION DETAIL DRAWER ═══════════ -->
+<div class="drawer-ov" id="drwOv" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drwhdr">
+    <span id="drwStatusBadge"></span>
+    <span class="drwtitle" id="drwTitle" style="margin-left:8px">执行详情</span>
+    <button class="drwclose" onclick="closeDrawer()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+    </button>
+  </div>
+  <div class="drwbody" id="drwBody">
+    <!-- dynamically populated -->
+  </div>
+  <div class="drwfoot" id="drwFoot">
+    <!-- dynamically populated -->
+  </div>
+</div>
+
+<!-- ═══════════ NEW TASK WIZARD (5 steps) ═══════════ -->
+<div class="mov" id="newTaskMov">
+  <div class="modal" style="max-width:560px;width:95%">
+    <div class="mhdr">
+      <span class="mtitle" id="wizTitle">新建调度任务</span>
+      <button class="mclose" onclick="wizClose()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+      </button>
+    </div>
+    <div class="mbody" id="wizBody" style="min-height:260px"></div>
+    <div class="mfoot">
+      <button class="btn btn-sec" id="wizBack" onclick="wizStep(-1)" style="display:none">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 6.5H3M6 3.5L3 6.5l3 3"/></svg>
+        上一步
+      </button>
+      <span style="flex:1"></span>
+      <button class="btn btn-sec" onclick="wizClose()">取消</button>
+      <button class="btn btn-pri" id="wizNext" onclick="wizStep(1)">
+        下一步
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6.5h6M7 3.5l3 3-3 3"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ TRIGGER CONFIRM MODAL ═══════════ -->
+<div class="mov" id="triggerMov">
+  <div class="modal">
+    <div class="mhdr">
+      <span class="mtitle">确认立即触发</span>
+      <button class="mclose" onclick="closeModal('triggerMov')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+      </button>
+    </div>
+    <div class="mbody">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">触发后将立即分配机器人执行，执行结果可在「执行记录」中查看。</p>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:12px;">
+        <div class="dgrid">
+          <div class="dit"><label>任务名称</label><div class="val cp" id="triggerTaskName">财务凭证自动录入</div></div>
+          <div class="dit"><label>当前版本</label><div class="val">财务凭证处理 v2.1</div></div>
+          <div class="dit"><label>执行机器人</label><div class="val">财务-机器人01</div></div>
+          <div class="dit"><label>机器人状态</label><div class="val"><span class="pill p-ok"><span class="pdot"></span>在线</span></div></div>
+          <div class="dit"><label>任务优先级</label><div class="val"><span class="pill p-hi"><span class="pdot"></span>高</span></div></div>
+          <div class="dit"><label>云日志</label><div class="val cm">已开启</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-sec" onclick="closeModal('triggerMov')">取消</button>
+      <button class="btn btn-acc" onclick="confirmTrigger()">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><polygon points="3,1.5 11.5,6.5 3,11.5" fill="currentColor" stroke="none"/></svg>
+        确认触发
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ TOAST ═══════════ -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── Execution data ── */
+const execData = {
+  '001': {
+    id: 'EXC-20260509-001', status: 'ok', statusLabel: '成功',
+    taskName: '财务凭证自动录入', app: '财务凭证处理 v2.1',
+    robot: '财务-机器人01 (192.168.1.101)', trigger: '手动触发',
+    triggeredBy: '张伟', triggeredAt: '2026-05-09 09:00:05',
+    startedAt: '2026-05-09 09:00:12', finishedAt: '2026-05-09 09:02:46',
+    duration: '2m 34s', errorMsg: null,
+    params: [{ name: 'file_path', type: 'str', value: '/data/finance/2026-05.xlsx' }, { name: 'sheet_index', type: 'float', value: '1' }],
+    log: `<div class="log-line"><span class="lt">[09:00:12]</span> <span class="li">[INFO]</span> 任务开始执行</div>
+<div class="log-line"><span class="lt">[09:00:12]</span> <span class="li">[INFO]</span> 初始化 RPA 应用: 财务凭证处理 v2.1</div>
+<div class="log-line"><span class="lt">[09:00:13]</span> <span class="li">[INFO]</span> 正在连接到影刀客户端...</div>
+<div class="log-line"><span class="lt">[09:00:14]</span> <span class="li">[INFO]</span> 机器人连接成功: 财务-机器人01 (192.168.1.101)</div>
+<div class="log-line"><span class="lt">[09:00:15]</span> <span class="li">[INFO]</span> 开始执行自动化流程</div>
+<div class="log-line"><span class="lt">[09:00:18]</span> <span class="li">[INFO]</span> 读取输入文件: /data/finance/2026-05.xlsx (sheet: 1)</div>
+<div class="log-line"><span class="lt">[09:01:23]</span> <span class="li">[INFO]</span> 正在处理 ERP 系统凭证数据... (已处理 23/47)</div>
+<div class="log-line"><span class="lt">[09:02:40]</span> <span class="li">[INFO]</span> 凭证录入完成，共处理 47 条记录</div>
+<div class="log-line"><span class="lt">[09:02:46]</span> <span class="lok">[SUCCESS]</span> 任务执行成功，总耗时 2m 34s</div>`
+  },
+  '002': {
+    id: 'EXC-20260509-002', status: 'run', statusLabel: '运行中',
+    taskName: '订单状态实时同步', app: '订单管理系统同步',
+    robot: '销售部-机器人03 (192.168.3.22)', trigger: '定时触发',
+    triggeredBy: '系统', triggeredAt: '2026-05-09 14:30:01',
+    startedAt: '2026-05-09 14:30:08', finishedAt: '—', duration: '—', errorMsg: null,
+    params: [{ name: 'sync_mode', type: 'str', value: 'incremental' }, { name: 'batch_size', type: 'float', value: '500' }],
+    log: `<div class="log-line"><span class="lt">[14:30:01]</span> <span class="li">[INFO]</span> 任务开始执行</div>
+<div class="log-line"><span class="lt">[14:30:01]</span> <span class="li">[INFO]</span> 初始化 RPA 应用: 订单管理系统同步</div>
+<div class="log-line"><span class="lt">[14:30:03]</span> <span class="li">[INFO]</span> 正在连接到影刀客户端...</div>
+<div class="log-line"><span class="lt">[14:30:04]</span> <span class="li">[INFO]</span> 机器人连接成功: 销售部-机器人03 (192.168.3.22)</div>
+<div class="log-line"><span class="lt">[14:30:08]</span> <span class="li">[INFO]</span> 开始执行自动化流程 (模式: incremental, 批次: 500)</div>
+<div class="log-line"><span class="lt">[14:30:58]</span> <span class="li">[INFO]</span> 正在同步订单数据... (已处理 234/1,847)</div>`
+  },
+  '003': {
+    id: 'EXC-20260508-018', status: 'err', statusLabel: '失败',
+    taskName: '月度报表自动导出', app: '月报生成器 v1.3',
+    robot: 'HR部-机器人02 (192.168.2.35)', trigger: '手动触发',
+    triggeredBy: '李明', triggeredAt: '2026-05-08 23:05:02',
+    startedAt: '2026-05-08 23:05:09', finishedAt: '2026-05-08 23:06:14',
+    duration: '1m 12s', errorMsg: '数据源连接超时：ConnectionTimeoutError (timeout: 30s)',
+    params: [{ name: 'report_month', type: 'str', value: '2026-04' }, { name: 'output_dir', type: 'str', value: '/reports/' }],
+    log: `<div class="log-line"><span class="lt">[23:05:02]</span> <span class="li">[INFO]</span> 任务开始执行</div>
+<div class="log-line"><span class="lt">[23:05:02]</span> <span class="li">[INFO]</span> 初始化 RPA 应用: 月报生成器 v1.3</div>
+<div class="log-line"><span class="lt">[23:05:04]</span> <span class="li">[INFO]</span> 机器人连接成功: HR部-机器人02 (192.168.2.35)</div>
+<div class="log-line"><span class="lt">[23:05:09]</span> <span class="li">[INFO]</span> 开始执行自动化流程</div>
+<div class="log-line"><span class="lt">[23:05:11]</span> <span class="li">[INFO]</span> 连接数据库... oracle://db-host.example.com:1521/yourdb</div>
+<div class="log-line"><span class="lt">[23:06:11]</span> <span class="ler">[ERROR]</span> 数据源连接超时 (timeout: 30s × 2 retries)</div>
+<div class="log-line"><span class="lt">[23:06:14]</span> <span class="ler">[ERROR]</span> 任务执行失败: ConnectionTimeoutError</div>`
+  }
+};
+
+const statusMap = {
+  ok: { cls: 'p-ok', label: '成功' },
+  run: { cls: 'p-run blink', label: '运行中' },
+  err: { cls: 'p-err', label: '失败' }
+};
+
+function openExecDetail(id) {
+  const d = execData[id] || execData['001'];
+  const sm = statusMap[d.status];
+
+  document.getElementById('drwStatusBadge').innerHTML =
+    `<span class="pill ${sm.cls}"><span class="pdot"></span>${d.statusLabel}</span>`;
+  document.getElementById('drwTitle').textContent = d.id;
+
+  const paramsHtml = d.params.map(p =>
+    `<tr><td class="cmono" style="padding:4px 8px;border-bottom:1px solid var(--border)">${p.name}</td><td class="cm" style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:10px">${p.type}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:12px">${p.value}</td></tr>`
+  ).join('');
+
+  document.getElementById('drwBody').innerHTML = `
+    <div class="dsec">
+      <div class="dsec-t">基础信息</div>
+      <div class="dgrid">
+        <div class="dit"><label>任务名称</label><div class="val">${d.taskName}</div></div>
+        <div class="dit"><label>触发应用</label><div class="val">${d.app}</div></div>
+        <div class="dit"><label>执行机器人</label><div class="val">${d.robot}</div></div>
+        <div class="dit"><label>触发方式</label><div class="val">${d.trigger} · <span class="cm">${d.triggeredBy}</span></div></div>
+        <div class="dit"><label>触发时间</label><div class="val cmono" style="font-size:11px">${d.triggeredAt}</div></div>
+        <div class="dit"><label>开始执行</label><div class="val cmono" style="font-size:11px">${d.startedAt}</div></div>
+        <div class="dit"><label>结束时间</label><div class="val cmono" style="font-size:11px">${d.finishedAt}</div></div>
+        <div class="dit"><label>执行时长</label><div class="val cmono" style="font-size:11px">${d.duration}</div></div>
+      </div>
+      ${d.errorMsg ? `<div style="margin-top:10px;padding:8px 10px;background:var(--s-err-bg);border-radius:var(--r);font-size:11px;color:var(--s-err)">错误信息: ${d.errorMsg}</div>` : ''}
+    </div>
+
+    <div class="dsec">
+      <div class="dsec-t">入参快照</div>
+      <table style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+        <thead><tr>
+          <th style="padding:5px 8px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--bg);font-weight:600;border-bottom:1px solid var(--border)">参数名</th>
+          <th style="padding:5px 8px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--bg);font-weight:600;border-bottom:1px solid var(--border)">类型</th>
+          <th style="padding:5px 8px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--bg);font-weight:600;border-bottom:1px solid var(--border)">值</th>
+        </tr></thead>
+        <tbody>${paramsHtml}</tbody>
+      </table>
+    </div>
+
+    <div class="dsec">
+      <div class="dsec-t">运行日志</div>
+      <div class="logarea">${d.log}</div>
+    </div>`;
+
+  const isRunning = d.status === 'run';
+  const isFailed = d.status === 'err';
+  document.getElementById('drwFoot').innerHTML = `
+    ${d.status !== 'run' ? '<button class="btn btn-sec btn-sm"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 11h11"/></svg>下载日志</button>' : ''}
+    ${isRunning ? '<button class="btn btn-sec btn-sm" style="color:var(--s-err)">停止执行</button>' : ''}
+    ${isFailed ? '<button class="btn btn-acc btn-sm">重试</button>' : ''}
+    <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="closeDrawer()">关闭</button>`;
+
+  document.getElementById('drwOv').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+  // highlight row
+  document.querySelectorAll('#page-executions tbody tr').forEach(r => r.classList.remove('sel'));
+}
+
+function closeDrawer() {
+  document.getElementById('drwOv').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
+
+/* ── Navigation ── */
+const pageMap = {
+  tasks:    { page: 'page-tasks',    bc: '调度任务',  navSub: 'nsi-tasks',    navGrp: 'ni-schedule', navItem: null },
+  executions:{ page: 'page-executions', bc: '执行记录', navSub: 'nsi-executions', navGrp: 'ni-schedule', navItem: null },
+  board:    { page: 'page-board',    bc: '排班看板',  navSub: 'nsi-board',    navGrp: 'ni-schedule', navItem: null },
+  apps:     { page: 'page-apps',     bc: 'RPA 应用',  navSub: 'nsi-apps',     navGrp: 'ni-resource', navItem: null },
+  robots:   { page: 'page-robots',   bc: '机器人管理', navSub: 'nsi-robots',   navGrp: 'ni-resource', navItem: null },
+  tags:     { page: 'page-tags',     bc: '标签管理',  navSub: 'nsi-tags',     navGrp: 'ni-resource', navItem: null },
+  accounts: { page: 'page-accounts', bc: '账号管理',  navSub: 'nsi-accounts', navGrp: 'ni-system',   navItem: null },
+  tenants:  { page: 'page-tenants',  bc: '组织管理',  navSub: 'nsi-tenants',  navGrp: 'ni-system',   navItem: null },
+  roles:    { page: 'page-roles',    bc: '角色权限',  navSub: 'nsi-roles',    navGrp: 'ni-system',   navItem: null },
+  overview: { page: 'page-overview', bc: '概览',      navSub: null,           navGrp: null,          navItem: 'ni-overview' },
+};
+
+function navigate(key) {
+  const m = pageMap[key];
+  if (!m) return;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(m.page).classList.add('active');
+  document.getElementById('bc-cur').textContent = m.bc;
+  document.querySelectorAll('.nsi').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  if (m.navSub) document.getElementById(m.navSub)?.classList.add('active');
+  if (m.navItem) document.getElementById(m.navItem)?.classList.add('active');
+  // auto-expand parent group
+  if (m.navGrp) {
+    const grpEl = document.getElementById(m.navGrp);
+    grpEl?.classList.add('open');
+    const grpKey = m.navGrp.replace('ni-', '');
+    document.getElementById('nsub-' + grpKey)?.classList.add('open');
+  }
+  closeDrawer();
+  closeSidebar();
+}
+
+function toggleGroup(key) {
+  const ni = document.getElementById('ni-' + key);
+  const sub = document.getElementById('nsub-' + key);
+  ni?.classList.toggle('open');
+  sub?.classList.toggle('open');
+}
+
+/* ── Sidebar ── */
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('mobOv').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mobOv').classList.remove('show');
+}
+
+/* ── Modals ── */
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openNewTaskModal() { wizReset(); openModal('newTaskMov'); }
+function openTrigger(name) {
+  document.getElementById('triggerTaskName').textContent = name;
+  openModal('triggerMov');
+}
+function confirmTrigger() {
+  closeModal('triggerMov');
+  showToast('任务已触发，正在排队执行…', 'ok');
+  setTimeout(() => navigate('executions'), 1200);
+}
+
+/* ── 5-step task wizard ── */
+let wizCurrentStep = 1;
+const wizSteps = [
+  { title: '新建调度任务 — 基本信息', label: '步骤 1/5 · 基本信息' },
+  { title: '新建调度任务 — 选择 RPA 应用', label: '步骤 2/5 · 选择应用 + 配置参数' },
+  { title: '新建调度任务 — 选择执行机器人', label: '步骤 3/5 · 选择机器人' },
+  { title: '新建调度任务 — 调度策略', label: '步骤 4/5 · 调度策略' },
+  { title: '新建调度任务 — 高级配置', label: '步骤 5/5 · 高级配置' },
+];
+const wizContents = [
+  // Step 1
+  `<div style="display:flex;gap:3px;margin-bottom:14px">
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--accent)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <span style="font-size:10px;color:var(--muted);margin-left:8px;white-space:nowrap">步骤 1/5</span>
+  </div>
+  <div class="field"><label>任务名称 <span class="req">*</span></label><input type="text" placeholder="不超过 50 字，如：财务凭证每日自动录入"></div>
+  <div class="field"><label>任务描述</label><textarea placeholder="简要说明此任务的用途和背景…"></textarea></div>
+  <div class="field"><label>标签</label><select><option>— 从本租户标签中选择 —</option><option>财务</option><option>审计</option><option>销售</option><option>HR</option><option>采购</option></select><div class="field-hint">标签来源于本租户的标签列表，用于分类检索</div></div>`,
+  // Step 2
+  `<div style="display:flex;gap:3px;margin-bottom:14px">
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--accent)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <span style="font-size:10px;color:var(--muted);margin-left:8px;white-space:nowrap">步骤 2/5</span>
+  </div>
+  <div class="field"><label>选择 RPA 应用 <span class="req">*</span></label><select onchange="wizToggleParams(this)"><option value="">— 搜索或下拉选择（仅限有权限应用）—</option><option value="app1">财务凭证处理 v2.1（支持参数）</option><option value="app2">订单管理系统同步 v1.5（支持参数）</option><option value="app3">合同管理应用 v3.0（不支持参数）</option></select></div>
+  <div id="wizParamArea" style="display:none">
+    <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">应用参数配置</div>
+    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      <table style="width:100%;font-size:11px">
+        <thead><tr style="background:var(--bg)"><th style="padding:5px 8px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600">参数名</th><th style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600;text-align:left">类型</th><th style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600;text-align:left">值</th><th style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600">必填</th></tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px"><span class="cmono">file_path</span><div style="font-size:10px;color:var(--muted)">输入文件路径</div></td><td style="padding:6px 8px"><span class="pill p-off" style="font-size:9px">str</span></td><td style="padding:6px 8px"><input type="text" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:3px;font-size:11px;outline:none;background:var(--surface)" placeholder="/data/finance/"></td><td style="padding:6px 8px;text-align:center"><span style="color:var(--s-err);font-size:11px">✱</span></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px"><span class="cmono">sheet_index</span><div style="font-size:10px;color:var(--muted)">工作表编号</div></td><td style="padding:6px 8px"><span class="pill p-off" style="font-size:9px">float</span></td><td style="padding:6px 8px"><input type="number" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:3px;font-size:11px;outline:none;background:var(--surface)" value="1"></td><td style="padding:6px 8px;text-align:center"><span style="color:var(--muted)">—</span></td></tr>
+          <tr><td style="padding:6px 8px"><span class="cmono">enable_backup</span><div style="font-size:10px;color:var(--muted)">执行前备份</div></td><td style="padding:6px 8px"><span class="pill p-off" style="font-size:9px">bool</span></td><td style="padding:6px 8px"><select style="padding:3px 6px;border:1px solid var(--border);border-radius:3px;font-size:11px;outline:none;background:var(--surface)"><option>true</option><option>false</option></select></td><td style="padding:6px 8px;text-align:center"><span style="color:var(--muted)">—</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>`,
+  // Step 3
+  `<div style="display:flex;gap:3px;margin-bottom:14px">
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--accent)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <span style="font-size:10px;color:var(--muted);margin-left:8px;white-space:nowrap">步骤 3/5</span>
+  </div>
+  <div class="field">
+    <label>执行模式 <span class="req">*</span></label>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--accent);border-radius:var(--r);cursor:pointer;flex:1;background:var(--accent-l)"><input type="radio" name="robotMode" value="single" checked style="accent-color:var(--accent)"> <span style="font-size:12px;font-weight:500">指定机器人</span></label>
+      <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r);cursor:pointer;flex:1"><input type="radio" name="robotMode" value="group" style="accent-color:var(--accent)"> <span style="font-size:12px;font-weight:500">指定机器人分组</span></label>
+    </div>
+  </div>
+  <div class="field"><label>选择机器人 <span class="req">*</span></label>
+    <select>
+      <option>— 选择机器人 —</option>
+      <option>财务-机器人01 (在线 · 192.168.1.101)</option>
+      <option>销售部-机器人03 (忙碌 · 192.168.3.22)</option>
+      <option>行政部-机器人01 (在线 · 192.168.4.88)</option>
+      <option>法务部-机器人01 (在线 · 192.168.5.14)</option>
+      <option>HR部-机器人02 (离线 · 192.168.2.35)</option>
+    </select>
+    <div class="field-hint" style="color:var(--s-warn)">⚠ 离线机器人将在有执行任务时自动等待上线</div>
+  </div>`,
+  // Step 4
+  `<div style="display:flex;gap:3px;margin-bottom:14px">
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--accent)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--border)"></div>
+    <span style="font-size:10px;color:var(--muted);margin-left:8px;white-space:nowrap">步骤 4/5</span>
+  </div>
+  <div class="field"><label>调度方式 <span class="req">*</span></label>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r);cursor:pointer;flex:1"><input type="radio" name="schedMode" value="manual" checked style="accent-color:var(--accent)"> <span style="font-size:12px;font-weight:500">立即触发</span></label>
+      <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r);cursor:pointer;flex:1"><input type="radio" name="schedMode" value="cron" style="accent-color:var(--accent)"> <span style="font-size:12px;font-weight:500">定时调度</span></label>
+    </div>
+  </div>
+  <div class="field"><label>定时规则</label>
+    <select><option>每天执行</option><option>每周执行</option><option>每月执行</option><option>自定义 Cron 表达式</option></select>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div class="field"><label>执行时间</label><input type="time" value="09:00" style=""></div>
+    <div class="field"><label>生效起始日</label><input type="date" value="2026-05-10"></div>
+  </div>
+  <div class="field"><label>生效截止日（可选）</label><input type="date" placeholder="不填则永久有效"></div>`,
+  // Step 5
+  `<div style="display:flex;gap:3px;margin-bottom:14px">
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--s-ok)"></div>
+    <div style="height:3px;flex:1;border-radius:2px;background:var(--accent)"></div>
+    <span style="font-size:10px;color:var(--muted);margin-left:8px;white-space:nowrap">步骤 5/5</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div class="field"><label>任务优先级</label><select><option>低 (0)</option><option selected>中 (100)</option><option>高 (200)</option></select></div>
+    <div class="field"><label>失败自动重试</label><select><option selected>不重试 (0次)</option><option>1次</option><option>2次</option><option>3次</option></select></div>
+    <div class="field"><label>应用运行超时（分钟）</label><input type="number" placeholder="不填则不限制" min="1"></div>
+    <div class="field"><label>等待超时（分钟）</label><input type="number" placeholder="不填则不限制" min="1"></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" style="accent-color:var(--accent)"><span>开启云日志（将运行日志上传云端，可在执行记录中下载）</span></label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" style="accent-color:var(--accent)"><span>开启云录屏（录制运行视频，可在执行记录中下载）</span></label>
+  </div>
+  <div class="field" style="margin-top:10px"><label>回调地址（可选）</label><input type="text" placeholder="https://your-server.com/callback — 配置后影刀将主动推送执行结果"><div class="field-hint">配置回调后无需前端轮询，实时性更好</div></div>`,
+];
+function wizReset() {
+  wizCurrentStep = 1;
+  wizRender();
+}
+function wizRender() {
+  const idx = wizCurrentStep - 1;
+  document.getElementById('wizTitle').textContent = wizSteps[idx].title;
+  document.getElementById('wizBody').innerHTML = wizContents[idx];
+  document.getElementById('wizBack').style.display = wizCurrentStep > 1 ? 'flex' : 'none';
+  const nextBtn = document.getElementById('wizNext');
+  if (wizCurrentStep === 5) {
+    nextBtn.innerHTML = '<svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 6.5h9M8 3.5l3 3-3 3"/></svg> 保存任务';
+    nextBtn.onclick = wizSave;
+  } else {
+    nextBtn.innerHTML = '下一步 <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6.5h6M7 3.5l3 3-3 3"/></svg>';
+    nextBtn.onclick = () => wizStep(1);
+  }
+}
+function wizStep(dir) {
+  wizCurrentStep = Math.max(1, Math.min(5, wizCurrentStep + dir));
+  wizRender();
+}
+function wizClose() { closeModal('newTaskMov'); }
+function wizSave() {
+  closeModal('newTaskMov');
+  showToast('调度任务已保存并启用', 'ok');
+  setTimeout(() => navigate('tasks'), 800);
+}
+function wizToggleParams(sel) {
+  const area = document.getElementById('wizParamArea');
+  if (area) area.style.display = sel.value && sel.value !== 'app3' ? 'block' : 'none';
+}
+
+/* ── Org tab switch ── */
+function switchOrgTab(tab) {
+  document.getElementById('tab-tenant').classList.toggle('active', tab === 'tenant');
+  document.getElementById('tab-dept').classList.toggle('active', tab === 'dept');
+  document.getElementById('org-tenant').style.display = tab === 'tenant' ? 'flex' : 'none';
+  document.getElementById('org-dept').style.display = tab === 'dept' ? 'flex' : 'none';
+}
+
+/* ── Tag color selector ── */
+function selectTagColor(el, color) {
+  document.querySelectorAll('.color-opt').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+/* ── Apps sync ── */
+function startSyncApps() {
+  const btn = document.getElementById('syncAppsBtn');
+  const info = document.getElementById('syncAppsInfo');
+  btn.classList.add('syncing');
+  btn.innerHTML = '<span class="spin"></span> 同步中…';
+  setTimeout(() => {
+    const now = new Date();
+    const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    btn.classList.remove('syncing');
+    btn.innerHTML = '<svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 6.5A4.5 4.5 0 112 6.5"/><path d="M11 2v4.5H6.5"/></svg>手动同步';
+    if (info) info.textContent = `最后同步: ${ts}`;
+    showToast('同步成功，共同步 18 个应用', 'ok');
+  }, 1800);
+}
+
+/* ── Header tenant/dept sync ── */
+const deptMap = {
+  all:   ['全部部门','财务部','销售部','人事部','行政部','法务部','采购部','技术部'],
+  east:  ['全部部门','财务部','销售部','技术部'],
+  north: ['全部部门','人事部','行政部','法务部'],
+  south: ['全部部门','采购部','销售部'],
+  hq:    ['全部部门','法务部','财务部','技术部']
+};
+function onTenantChange(val) {
+  const sel = document.getElementById('deptSel');
+  const opts = deptMap[val] || deptMap.all;
+  sel.innerHTML = opts.map((o,i) => `<option value="${i===0?'all':o}">${o}</option>`).join('');
+}
+
+/* ── Toast ── */
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ── Sync simulation ── */
+function startSync(type) {
+  const btn = document.getElementById(type === 'robot' ? 'syncRobotBtn' : 'syncAccBtn');
+  const info = document.getElementById(type === 'robot' ? 'syncRobotInfo' : 'syncAccInfo');
+  if (!btn) return;
+  btn.classList.add('syncing');
+  btn.innerHTML = '<span class="spin"></span> 同步中…';
+  setTimeout(() => {
+    const now = new Date();
+    const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    btn.classList.remove('syncing');
+    btn.innerHTML = `<svg id="sync${type==='robot'?'Robot':'Acc'}Ico" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 6.5A4.5 4.5 0 112 6.5"/><path d="M11 2v4.5H6.5"/></svg>手动同步`;
+    if (info) info.textContent = `最后同步: ${ts}`;
+    showToast(type === 'robot' ? '同步成功，共同步 24 台机器人' : '同步成功，共同步 89 条账号', 'ok');
+  }, 1800);
+}
+
+/* ── Select all checkboxes ── */
+function selectAll(master, scope) {
+  document.querySelectorAll(`.row-chk-${scope}`).forEach(c => c.checked = master.checked);
+}
+
+/* ── Close modals on overlay click ── */
+document.querySelectorAll('.mov').forEach(ov => {
+  ov.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
+});
+</script>
+
+<!-- ═══════════ NEW TAG MODAL ═══════════ -->
+<div class="mov" id="newTagMov">
+  <div class="modal" style="max-width:380px">
+    <div class="mhdr">
+      <span class="mtitle">新建标签</span>
+      <button class="mclose" onclick="closeModal('newTagMov')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+      </button>
+    </div>
+    <div class="mbody">
+      <div class="field"><label>标签名称 <span class="req">*</span></label><input type="text" placeholder="不超过 20 字，同一租户内唯一"></div>
+      <div class="field">
+        <label>标签颜色</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <div onclick="selectTagColor(this,'#22c55e')" style="width:22px;height:22px;border-radius:4px;background:#22c55e;cursor:pointer;border:2px solid transparent" class="color-opt selected"></div>
+          <div onclick="selectTagColor(this,'#f59e0b')" style="width:22px;height:22px;border-radius:4px;background:#f59e0b;cursor:pointer;border:2px solid transparent" class="color-opt"></div>
+          <div onclick="selectTagColor(this,'#3b82f6')" style="width:22px;height:22px;border-radius:4px;background:#3b82f6;cursor:pointer;border:2px solid transparent" class="color-opt"></div>
+          <div onclick="selectTagColor(this,'#8b5cf6')" style="width:22px;height:22px;border-radius:4px;background:#8b5cf6;cursor:pointer;border:2px solid transparent" class="color-opt"></div>
+          <div onclick="selectTagColor(this,'#ef4444')" style="width:22px;height:22px;border-radius:4px;background:#ef4444;cursor:pointer;border:2px solid transparent" class="color-opt"></div>
+          <div onclick="selectTagColor(this,'#6b7280')" style="width:22px;height:22px;border-radius:4px;background:#6b7280;cursor:pointer;border:2px solid transparent" class="color-opt"></div>
+        </div>
+        <div class="field-hint">从预设颜色中选择，默认绿色</div>
+      </div>
+      <div class="field"><label>标签描述</label><textarea placeholder="可选，不超过 100 字…" style="min-height:54px"></textarea></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-sec" onclick="closeModal('newTagMov')">取消</button>
+      <button class="btn btn-pri" onclick="showToast('标签已创建','ok');closeModal('newTagMov')">创建标签</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ NEW TENANT MODAL ═══════════ -->
+<div class="mov" id="newTenantMov">
+  <div class="modal" style="max-width:420px">
+    <div class="mhdr">
+      <span class="mtitle">新建租户</span>
+      <button class="mclose" onclick="closeModal('newTenantMov')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+      </button>
+    </div>
+    <div class="mbody">
+      <div class="field"><label>租户名称 <span class="req">*</span></label><input type="text" placeholder="不超过 50 字，同一系统内唯一，如：华东子公司"><div class="field-hint">系统将自动生成租户 ID，创建后不可修改</div></div>
+      <div class="field"><label>租户描述</label><textarea placeholder="不超过 200 字…" style="min-height:68px"></textarea></div>
+      <div class="field">
+        <label>租户管理员（可选）</label>
+        <select><option>— 从已同步账号中选择 —</option><option>李明 (li.ming)</option><option>王芳 (wang.fang)</option><option>赵磊 (zhao.lei)</option></select>
+        <div class="field-hint">可后续在账号管理中修改角色</div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-sec" onclick="closeModal('newTenantMov')">取消</button>
+      <button class="btn btn-pri" onclick="showToast('租户已创建','ok');closeModal('newTenantMov')">创建租户</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ NEW DEPT MODAL ═══════════ -->
+<div class="mov" id="newDeptMov">
+  <div class="modal" style="max-width:400px">
+    <div class="mhdr">
+      <span class="mtitle">新建部门</span>
+      <button class="mclose" onclick="closeModal('newDeptMov')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+      </button>
+    </div>
+    <div class="mbody">
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--accent-l);border-radius:var(--r);font-size:11px;color:var(--accent);margin-bottom:14px">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1" y="3" width="9" height="7" rx=".7"/><path d="M3.5 3V2a2 2 0 014 0v1"/></svg>
+        将在「华东子公司」下创建部门
+      </div>
+      <div class="field"><label>部门名称 <span class="req">*</span></label><input type="text" placeholder="不超过 50 字，同一租户内唯一"></div>
+      <div class="field"><label>部门描述</label><textarea placeholder="可选…" style="min-height:54px"></textarea></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-sec" onclick="closeModal('newDeptMov')">取消</button>
+      <button class="btn btn-pri" onclick="showToast('部门已创建','ok');closeModal('newDeptMov')">创建部门</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Board (Gantt) ── */
+const boardData = [
+  { name: '财务-机器人01', dept: '财务部', status: 'online',
+    slots: [
+      { h:9, m:0, dur:2.6, s:'ok', label:'财务凭证录入' },
+      { h:9, m:0, dur:1.9, s:'ok', label:'财务凭证录入' },
+      { h:12, m:30, dur:3.2, s:'ok', label:'财务凭证录入' }
+    ]
+  },
+  { name: '销售部-机器人03', dept: '销售部', status: 'busy',
+    slots: [
+      { h:7, m:30, dur:1.5, s:'ok', label:'订单同步' },
+      { h:8, m:30, dur:1.5, s:'ok', label:'订单同步' },
+      { h:14, m:30, dur:99, s:'run', label:'订单状态实时同步（运行中）' }
+    ]
+  },
+  { name: 'HR部-机器人02', dept: '人事部', status: 'offline',
+    slots: [
+      { h:23, m:5, dur:1.2, s:'err', label:'月报导出（失败）' }
+    ]
+  },
+  { name: '行政部-机器人01', dept: '行政部', status: 'online',
+    slots: [
+      { h:9, m:0, dur:0.8, s:'ok', label:'邮件通知' },
+      { h:18, m:0, dur:0.9, s:'sched', label:'员工通知（排期）' }
+    ]
+  },
+  { name: '法务部-机器人01', dept: '法务部', status: 'online',
+    slots: [
+      { h:8, m:2, dur:5.3, s:'ok', label:'合同信息提取' }
+    ]
+  },
+  { name: '采购部-机器人02', dept: '采购部', status: 'online',
+    slots: [
+      { h:7, m:31, dur:1.2, s:'ok', label:'采购核对' },
+      { h:14, m:0, dur:1.2, s:'ok', label:'采购核对' }
+    ]
+  },
+  { name: '技术部-机器人03', dept: '技术部', status: 'online',
+    slots: Array.from({length:15}, (_,i) => ({ h:i, m:2, dur:0.8, s:'ok', label:'ERP同步' }))
+  }
+];
+
+const statusColors = {
+  ok: 'var(--s-ok)', run: 'var(--s-run)', err: 'var(--s-err)',
+  warn: 'var(--s-warn)', sched: 'transparent'
+};
+const statusBorder = { sched: '1px dashed var(--muted)' };
+const robotStatusPill = {
+  online: '<span class="pill p-ok" style="font-size:9px"><span class="pdot"></span>在线</span>',
+  offline: '<span class="pill p-off" style="font-size:9px"><span class="pdot"></span>离线</span>',
+  busy: '<span class="pill p-run blink" style="font-size:9px"><span class="pdot"></span>忙碌</span>'
+};
+
+function renderBoard() {
+  const container = document.getElementById('boardRows');
+  if (!container) return;
+  const dayMins = 24 * 60;
+  container.innerHTML = boardData.map(robot => {
+    const slotsHtml = robot.slots.map(slot => {
+      const startMin = slot.h * 60 + slot.m;
+      const endMin = Math.min(startMin + slot.dur * 60, dayMins);
+      const left = (startMin / dayMins * 100).toFixed(3);
+      const width = ((endMin - startMin) / dayMins * 100).toFixed(3);
+      const bg = statusColors[slot.s] || 'var(--border)';
+      const border = statusBorder[slot.s] || 'none';
+      const blinkClass = slot.s === 'run' ? ' blink' : '';
+      return `<div title="${slot.label}" class="${blinkClass}" style="position:absolute;left:${left}%;width:${width}%;height:18px;top:50%;transform:translateY(-50%);border-radius:3px;background:${bg};border:${border};opacity:.85;cursor:pointer;transition:opacity .1s" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.85"></div>`;
+    }).join('');
+
+    return `<div style="display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid var(--border);min-height:40px;align-items:stretch">
+      <div style="padding:8px 4px 8px 4px;display:flex;flex-direction:column;justify-content:center;gap:2px;border-right:1px solid var(--border)">
+        <span style="font-size:11px;font-weight:500;color:var(--fg)">${robot.name}</span>
+        <span style="display:flex;align-items:center;gap:4px">${robotStatusPill[robot.status]}</span>
+      </div>
+      <div style="position:relative;background:var(--bg)">
+        <!-- hour grid lines -->
+        ${Array.from({length:23}, (_,i) => `<div style="position:absolute;left:${((i+1)/24*100).toFixed(2)}%;top:0;bottom:0;width:1px;background:var(--border);opacity:.5"></div>`).join('')}
+        ${slotsHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+renderBoard();
+</script>
+</body>
+</html>

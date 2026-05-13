@@ -1,0 +1,2345 @@
+openapi: 3.0.3
+info:
+  title: RPA Console API
+  description: RPA Console 后端接口规范，基于 PRD v1.4
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: 本地开发环境
+  - url: https://your-api-host.example.com
+    description: 生产环境
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ─── 通用结构 ──────────────────────────────────────────
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+          description: 0=成功，非0=失败
+        message:
+          type: string
+          example: 操作成功
+        data:
+          nullable: true
+
+    PageResult:
+      type: object
+      properties:
+        records:
+          type: array
+          items: {}
+        total:
+          type: integer
+          example: 100
+        current:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 20
+
+    SyncResult:
+      type: object
+      properties:
+        synced:
+          type: integer
+          description: 本次同步条数
+          example: 42
+        lastSyncTime:
+          type: string
+          format: date-time
+
+    # ─── 认证 ──────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [loginAccount, password]
+      properties:
+        loginAccount:
+          type: string
+          example: zhang.san@company.com
+        password:
+          type: string
+          example: "demo-password"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT Token
+        userId:
+          type: string
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/ConsoleRole'
+        tenantId:
+          type: string
+          nullable: true
+        deptId:
+          type: string
+          nullable: true
+
+    UserInfoVO:
+      type: object
+      properties:
+        accountId:
+          type: string
+        name:
+          type: string
+        loginAccount:
+          type: string
+        role:
+          $ref: '#/components/schemas/ConsoleRole'
+        tenantId:
+          type: string
+          nullable: true
+        tenantName:
+          type: string
+          nullable: true
+        deptId:
+          type: string
+          nullable: true
+        deptName:
+          type: string
+          nullable: true
+
+    # ─── 枚举 ──────────────────────────────────────────────
+    ConsoleRole:
+      type: string
+      enum: [SUPER_ADMIN, TENANT_ADMIN, MEMBER]
+
+    TenantStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE]
+
+    RobotStatus:
+      type: string
+      enum: [ONLINE, OFFLINE, BUSY]
+
+    ExecutionStatus:
+      type: string
+      enum: [RUNNING, SUCCESS, FAILED, STOPPED, TIMEOUT]
+
+    ScheduleType:
+      type: string
+      enum: [IMMEDIATE, CRON]
+
+    TaskStatus:
+      type: string
+      enum: [ENABLED, DISABLED]
+
+    TriggerType:
+      type: string
+      enum: [MANUAL, SCHEDULED]
+
+    ResourceType:
+      type: string
+      enum: [ACCOUNT, RPA_APP, ROBOT, SCHEDULE_TASK]
+
+    Priority:
+      type: string
+      enum: ["0", "100", "200"]
+      description: "0=低, 100=中, 200=高"
+
+    # ─── 租户 ──────────────────────────────────────────────
+    TenantVO:
+      type: object
+      properties:
+        tenantId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/TenantStatus'
+        deptCount:
+          type: integer
+        accountCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateTenantRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 200
+          nullable: true
+        adminAccountIds:
+          type: array
+          items:
+            type: string
+          description: 初始化时指定的租户管理员账号 ID 列表（可选）
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 200
+          nullable: true
+
+    UpdateTenantStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/TenantStatus'
+
+    # ─── 部门 ──────────────────────────────────────────────
+    DepartmentVO:
+      type: object
+      properties:
+        deptId:
+          type: string
+        tenantId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        accountCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateDepartmentRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 200
+          nullable: true
+
+    UpdateDepartmentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 200
+          nullable: true
+
+    # ─── 账号 ──────────────────────────────────────────────
+    AccountVO:
+      type: object
+      properties:
+        accountId:
+          type: string
+        name:
+          type: string
+        loginAccount:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        xybotRole:
+          type: string
+          nullable: true
+        tenantId:
+          type: string
+          nullable: true
+        tenantName:
+          type: string
+          nullable: true
+        deptId:
+          type: string
+          nullable: true
+        deptName:
+          type: string
+          nullable: true
+        consoleRole:
+          $ref: '#/components/schemas/ConsoleRole'
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED]
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagSimpleVO'
+        syncedAt:
+          type: string
+          format: date-time
+
+    AssignAccountTenantRequest:
+      type: object
+      required: [tenantId]
+      properties:
+        tenantId:
+          type: string
+        role:
+          $ref: '#/components/schemas/ConsoleRole'
+          description: 在该租户下的角色，不传则保持 MEMBER
+
+    AssignAccountDepartmentRequest:
+      type: object
+      required: [deptId]
+      properties:
+        deptId:
+          type: string
+          nullable: true
+          description: null 表示移出部门，回到租户级
+
+    UpdateAccountRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          $ref: '#/components/schemas/ConsoleRole'
+
+    # ─── RPA 应用 ──────────────────────────────────────────
+    AppParam:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: str / float / bool / file 等
+        value:
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        direction:
+          type: string
+          enum: [In, Out]
+
+    RpaAppVO:
+      type: object
+      properties:
+        appId:
+          type: string
+        appUuid:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+          nullable: true
+        supportParam:
+          type: boolean
+        ownerName:
+          type: string
+          nullable: true
+        tenantMappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppMappingVO'
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagSimpleVO'
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED]
+        syncedAt:
+          type: string
+          format: date-time
+
+    RpaAppDetailVO:
+      allOf:
+        - $ref: '#/components/schemas/RpaAppVO'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            inputParams:
+              type: array
+              items:
+                $ref: '#/components/schemas/AppParam'
+            outputParams:
+              type: array
+              items:
+                $ref: '#/components/schemas/AppParam'
+
+    AppMappingVO:
+      type: object
+      properties:
+        mappingId:
+          type: string
+        tenantId:
+          type: string
+        tenantName:
+          type: string
+        deptId:
+          type: string
+          nullable: true
+        deptName:
+          type: string
+          nullable: true
+
+    CreateAppMappingRequest:
+      type: object
+      required: [tenantId]
+      properties:
+        tenantId:
+          type: string
+        deptId:
+          type: string
+          nullable: true
+
+    # ─── 机器人 ──────────────────────────────────────────────
+    RobotVO:
+      type: object
+      properties:
+        robotId:
+          type: string
+        xybotRobotClientUuid:
+          type: string
+        name:
+          type: string
+        accountId:
+          type: string
+          nullable: true
+        accountName:
+          type: string
+          nullable: true
+        tenantId:
+          type: string
+          nullable: true
+        tenantName:
+          type: string
+          nullable: true
+        deptId:
+          type: string
+          nullable: true
+        deptName:
+          type: string
+          nullable: true
+        groupUuid:
+          type: string
+          nullable: true
+        groupName:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/RobotStatus'
+        clientIp:
+          type: string
+          nullable: true
+          description: 机器人所在机器 IP（UI 列表子文本显示）
+        currentAppName:
+          type: string
+          nullable: true
+          description: 忙碌时正在运行的应用名称（实时 JOIN task_execution 推导）
+        lastHeartbeat:
+          type: string
+          format: date-time
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagSimpleVO'
+        syncedAt:
+          type: string
+          format: date-time
+
+    RobotGroupVO:
+      type: object
+      properties:
+        groupId:
+          type: string
+        xybotGroupUuid:
+          type: string
+        name:
+          type: string
+
+    # ─── 标签 ──────────────────────────────────────────────
+    TagSimpleVO:
+      type: object
+      properties:
+        tagId:
+          type: string
+        name:
+          type: string
+        color:
+          type: string
+
+    TagVO:
+      allOf:
+        - $ref: '#/components/schemas/TagSimpleVO'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            accountCount:
+              type: integer
+            appCount:
+              type: integer
+            robotCount:
+              type: integer
+            taskCount:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+
+    CreateTagRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 20
+        color:
+          type: string
+          maxLength: 10
+          default: '#9CA3AF'
+        description:
+          type: string
+          maxLength: 100
+          nullable: true
+
+    UpdateTagRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 20
+        color:
+          type: string
+          maxLength: 10
+        description:
+          type: string
+          maxLength: 100
+          nullable: true
+
+    SetResourceTagsRequest:
+      type: object
+      required: [resourceType, resourceId, tagIds]
+      properties:
+        resourceType:
+          $ref: '#/components/schemas/ResourceType'
+        resourceId:
+          type: string
+        tagIds:
+          type: array
+          items:
+            type: string
+
+    BatchSetResourceTagsRequest:
+      type: object
+      required: [resourceType, resourceIds, tagIds, mode]
+      properties:
+        resourceType:
+          $ref: '#/components/schemas/ResourceType'
+        resourceIds:
+          type: array
+          items:
+            type: string
+        tagIds:
+          type: array
+          items:
+            type: string
+        mode:
+          type: string
+          enum: [APPEND, REPLACE]
+          description: APPEND=追加，REPLACE=替换
+
+    # ─── 调度任务 ──────────────────────────────────────────
+    ScheduleTaskVO:
+      type: object
+      properties:
+        taskId:
+          type: string
+        name:
+          type: string
+        appId:
+          type: string
+        appName:
+          type: string
+        robotId:
+          type: string
+          nullable: true
+        robotName:
+          type: string
+          nullable: true
+        groupUuid:
+          type: string
+          nullable: true
+        groupName:
+          type: string
+          nullable: true
+        scheduleType:
+          $ref: '#/components/schemas/ScheduleType'
+        cronExpr:
+          type: string
+          nullable: true
+        priority:
+          $ref: '#/components/schemas/Priority'
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        lastExecutionTime:
+          type: string
+          format: date-time
+          nullable: true
+        lastExecutionStatus:
+          $ref: '#/components/schemas/ExecutionStatus'
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagSimpleVO'
+        createdBy:
+          type: string
+        createdByName:
+          type: string
+          description: 创建人显示名称
+        createdAt:
+          type: string
+          format: date-time
+
+    ScheduleTaskDetailVO:
+      allOf:
+        - $ref: '#/components/schemas/ScheduleTaskVO'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            executeScope:
+              type: string
+              enum: [any, all]
+              nullable: true
+            validFrom:
+              type: string
+              format: date-time
+              nullable: true
+            validTo:
+              type: string
+              format: date-time
+              nullable: true
+            inputParams:
+              type: array
+              items:
+                $ref: '#/components/schemas/AppParam'
+            runTimeoutSeconds:
+              type: integer
+              nullable: true
+            waitTimeoutSeconds:
+              type: integer
+              nullable: true
+            retryTimes:
+              type: integer
+            enableCloudLog:
+              type: boolean
+            enableCloudScreen:
+              type: boolean
+            callbackUrl:
+              type: string
+              nullable: true
+
+    CreateScheduleTaskRequest:
+      type: object
+      required: [name, appId, scheduleType]
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          nullable: true
+        tagIds:
+          type: array
+          items:
+            type: string
+        appId:
+          type: string
+        inputParams:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppParam'
+        robotId:
+          type: string
+          nullable: true
+          description: 指定机器人模式，与 groupUuid 二选一
+        groupUuid:
+          type: string
+          nullable: true
+          description: 指定分组模式，与 robotId 二选一
+        executeScope:
+          type: string
+          enum: [any, all]
+          nullable: true
+        scheduleType:
+          $ref: '#/components/schemas/ScheduleType'
+        cronExpr:
+          type: string
+          nullable: true
+        validFrom:
+          type: string
+          format: date-time
+          nullable: true
+        validTo:
+          type: string
+          format: date-time
+          nullable: true
+        priority:
+          $ref: '#/components/schemas/Priority'
+          default: "0"
+        runTimeoutSeconds:
+          type: integer
+          nullable: true
+        waitTimeoutSeconds:
+          type: integer
+          nullable: true
+        retryTimes:
+          type: integer
+          default: 0
+          minimum: 0
+          maximum: 3
+        enableCloudLog:
+          type: boolean
+          default: false
+        enableCloudScreen:
+          type: boolean
+          default: false
+        callbackUrl:
+          type: string
+          nullable: true
+
+    TriggerTaskRequest:
+      type: object
+      required: [idempotentUuid]
+      properties:
+        idempotentUuid:
+          type: string
+          description: 客户端生成的唯一 UUID，防止重复提交
+        inputParams:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppParam'
+          description: 临时覆盖参数值，不传则使用任务保存的参数
+
+    UpdateTaskStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+
+    # ─── 执行记录 ──────────────────────────────────────────
+    TaskExecutionVO:
+      type: object
+      properties:
+        executionId:
+          type: string
+        taskId:
+          type: string
+        taskName:
+          type: string
+        appName:
+          type: string
+        robotName:
+          type: string
+          nullable: true
+        triggeredBy:
+          type: string
+          description: 账号名称或 "系统"
+        triggerType:
+          $ref: '#/components/schemas/TriggerType'
+        triggeredAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        durationSeconds:
+          type: integer
+          nullable: true
+        status:
+          $ref: '#/components/schemas/ExecutionStatus'
+        errorMessage:
+          type: string
+          nullable: true
+        cloudLogUrl:
+          type: string
+          nullable: true
+        cloudScreenUrl:
+          type: string
+          nullable: true
+
+    TaskExecutionDetailVO:
+      allOf:
+        - $ref: '#/components/schemas/TaskExecutionVO'
+        - type: object
+          properties:
+            inputParamsSnapshot:
+              type: array
+              items:
+                $ref: '#/components/schemas/AppParam'
+            outputParamsSnapshot:
+              type: array
+              items:
+                $ref: '#/components/schemas/AppParam'
+              nullable: true
+            screenshotUrl:
+              type: string
+              nullable: true
+            xybotJobUuid:
+              type: string
+              nullable: true
+
+    XybotCallbackRequest:
+      type: object
+      required: [jobUuid, status]
+      properties:
+        jobUuid:
+          type: string
+        status:
+          type: string
+          enum: [success, failed]
+        startTime:
+          type: string
+          format: date-time
+          nullable: true
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        remark:
+          type: string
+          nullable: true
+          description: 失败原因
+        outputParams:
+          nullable: true
+        screenshotUrl:
+          type: string
+          nullable: true
+        cloudLogFileDownloadUrl:
+          type: string
+          nullable: true
+        cloudScreenFileDownloadUrl:
+          type: string
+          nullable: true
+
+    # ─── 排班看板 ──────────────────────────────────────────
+    ScheduleBoardVO:
+      type: object
+      properties:
+        robots:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardRobotVO'
+
+    BoardRobotVO:
+      type: object
+      properties:
+        robotId:
+          type: string
+        robotName:
+          type: string
+        status:
+          $ref: '#/components/schemas/RobotStatus'
+        groupName:
+          type: string
+          nullable: true
+        executions:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardExecutionVO'
+
+    BoardExecutionVO:
+      type: object
+      properties:
+        slotType:
+          type: string
+          enum: [EXECUTION, SCHEDULED_SLOT]
+          description: "EXECUTION=历史/当前执行记录；SCHEDULED_SLOT=未来预排槽（Gantt 上显示为虚线）"
+        executionId:
+          type: string
+          nullable: true
+          description: slotType=EXECUTION 时有值
+        taskId:
+          type: string
+        taskName:
+          type: string
+        appName:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: EXECUTION=实际开始时间；SCHEDULED_SLOT=预计开始时间
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: EXECUTION=实际结束时间；SCHEDULED_SLOT 为 null
+        estimatedDurationMinutes:
+          type: integer
+          nullable: true
+          description: 仅 slotType=SCHEDULED_SLOT 时有值，取任务历史平均时长
+        triggeredAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 仅 EXECUTION 有值
+        status:
+          $ref: '#/components/schemas/ExecutionStatus'
+          nullable: true
+          description: SCHEDULED_SLOT 时为 null
+
+    # ─── Dashboard ──────────────────────────────────────────
+    DashboardStatsVO:
+      type: object
+      properties:
+        todayExecutionCount:
+          type: integer
+        todayExecutionCountDelta:
+          type: integer
+          description: 与昨日相比的数量差值（正数=增加，负数=减少）
+        todaySuccessRate:
+          type: number
+          format: double
+          description: 0.0 ~ 1.0
+        todaySuccessRateDelta:
+          type: number
+          format: double
+          description: 与昨日成功率的差值
+        todayRobotUtilization:
+          type: number
+          format: double
+        todayRobotUtilizationDelta:
+          type: number
+          format: double
+          description: 与昨日利用率的差值
+        totalExecutionCount:
+          type: integer
+        activeRobotCount:
+          type: integer
+
+    ExecutionTrendVO:
+      type: object
+      properties:
+        dates:
+          type: array
+          items:
+            type: string
+            format: date
+        successCounts:
+          type: array
+          items:
+            type: integer
+        failedCounts:
+          type: array
+          items:
+            type: integer
+
+    AppRankingVO:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              appName:
+                type: string
+              executionCount:
+                type: integer
+
+    RobotUtilizationVO:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              robotName:
+                type: string
+              utilizationRate:
+                type: number
+                format: double
+
+    TagStatsVO:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              tagName:
+                type: string
+              color:
+                type: string
+              executionCount:
+                type: integer
+
+# ─── Paths ──────────────────────────────────────────────────
+
+paths:
+
+  # ── 认证 ────────────────────────────────────────────────
+  /api/v1/auth/login:
+    post:
+      tags: [认证]
+      summary: 账号密码登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 账号或密码错误
+
+  /api/v1/auth/logout:
+    post:
+      tags: [认证]
+      summary: 登出
+      responses:
+        '200':
+          description: 登出成功
+
+  /api/v1/auth/me:
+    get:
+      tags: [认证]
+      summary: 获取当前用户信息
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserInfoVO'
+
+  # ── 租户管理 ──────────────────────────────────────────────
+  /api/v1/tenants:
+    get:
+      tags: [租户管理]
+      summary: 租户列表（超级管理员专属）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: 名称模糊搜索
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TenantStatus'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResult'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/TenantVO'
+    post:
+      tags: [租户管理]
+      summary: 新建租户
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TenantVO'
+
+  /api/v1/tenants/{tenantId}:
+    get:
+      tags: [租户管理]
+      summary: 租户详情
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TenantVO'
+    put:
+      tags: [租户管理]
+      summary: 编辑租户
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantRequest'
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/tenants/{tenantId}/status:
+    patch:
+      tags: [租户管理]
+      summary: 启用/停用租户
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantStatusRequest'
+      responses:
+        '200':
+          description: 成功
+
+  # ── 部门管理 ──────────────────────────────────────────────
+  /api/v1/tenants/{tenantId}/departments:
+    get:
+      tags: [部门管理]
+      summary: 部门列表
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DepartmentVO'
+    post:
+      tags: [部门管理]
+      summary: 新建部门
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDepartmentRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DepartmentVO'
+
+  /api/v1/departments/{deptId}:
+    put:
+      tags: [部门管理]
+      summary: 编辑部门
+      parameters:
+        - name: deptId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDepartmentRequest'
+      responses:
+        '200':
+          description: 成功
+    delete:
+      tags: [部门管理]
+      summary: 删除部门（部门下无账号时才可删除）
+      parameters:
+        - name: deptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+        '400':
+          description: 部门下存在账号，无法删除（错误码 10005）
+
+  # ── 账号管理 ──────────────────────────────────────────────
+  /api/v1/accounts:
+    get:
+      tags: [账号管理]
+      summary: 账号列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+        - name: deptId
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/ConsoleRole'
+        - name: tagIds
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResult'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/AccountVO'
+                              lastSyncTime:
+                                type: string
+                                format: date-time
+                                nullable: true
+
+  /api/v1/accounts/{accountId}:
+    get:
+      tags: [账号管理]
+      summary: 账号详情（超级管理员可查任意账号）
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AccountVO'
+
+  /api/v1/accounts/sync:
+    post:
+      tags: [账号管理]
+      summary: 手动同步账号
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SyncResult'
+
+  /api/v1/accounts/{accountId}/tenant:
+    put:
+      tags: [账号管理]
+      summary: 关联账号到租户
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignAccountTenantRequest'
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/accounts/{accountId}/department:
+    put:
+      tags: [账号管理]
+      summary: 分配账号到部门
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignAccountDepartmentRequest'
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/accounts/{accountId}/role:
+    put:
+      tags: [账号管理]
+      summary: 设置账号角色
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountRoleRequest'
+      responses:
+        '200':
+          description: 成功
+
+  # ── RPA 应用管理 ──────────────────────────────────────────
+  /api/v1/rpa-apps:
+    get:
+      tags: [RPA 应用管理]
+      summary: 应用列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+        - name: tagIds
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResult'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/RpaAppVO'
+                              lastSyncTime:
+                                type: string
+                                format: date-time
+                                nullable: true
+
+  /api/v1/rpa-apps/sync:
+    post:
+      tags: [RPA 应用管理]
+      summary: 手动同步 RPA 应用
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SyncResult'
+
+  /api/v1/rpa-apps/{appId}:
+    get:
+      tags: [RPA 应用管理]
+      summary: 应用详情（含参数定义）
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RpaAppDetailVO'
+
+  /api/v1/rpa-apps/{appId}/tenant-mappings:
+    post:
+      tags: [RPA 应用管理]
+      summary: 关联应用到租户/部门
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAppMappingRequest'
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/rpa-apps/tenant-mappings/{mappingId}:
+    delete:
+      tags: [RPA 应用管理]
+      summary: 解除应用与租户/部门的关联
+      parameters:
+        - name: mappingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  # ── 机器人管理 ────────────────────────────────────────────
+  /api/v1/robots:
+    get:
+      tags: [机器人管理]
+      summary: 机器人列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/RobotStatus'
+        - name: groupUuid
+          in: query
+          schema:
+            type: string
+        - name: tagIds
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResult'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/RobotVO'
+                              lastSyncTime:
+                                type: string
+                                format: date-time
+                                nullable: true
+
+  /api/v1/robots/sync:
+    post:
+      tags: [机器人管理]
+      summary: 手动同步机器人
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SyncResult'
+
+  /api/v1/robots/{robotId}:
+    get:
+      tags: [机器人管理]
+      summary: 机器人详情
+      parameters:
+        - name: robotId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RobotVO'
+
+  /api/v1/robot-groups:
+    get:
+      tags: [机器人管理]
+      summary: 机器人分组列表
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RobotGroupVO'
+
+  # ── 标签管理 ──────────────────────────────────────────────
+  /api/v1/tags:
+    get:
+      tags: [标签管理]
+      summary: 标签列表（按当前租户）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TagVO'
+    post:
+      tags: [标签管理]
+      summary: 新建标签
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTagRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TagVO'
+
+  /api/v1/tags/{tagId}:
+    put:
+      tags: [标签管理]
+      summary: 编辑标签
+      parameters:
+        - name: tagId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTagRequest'
+      responses:
+        '200':
+          description: 成功
+    delete:
+      tags: [标签管理]
+      summary: 删除标签（自动解除所有资源关联）
+      parameters:
+        - name: tagId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/resource-tags:
+    put:
+      tags: [标签管理]
+      summary: 设置资源的标签（全量替换）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetResourceTagsRequest'
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/resource-tags/batch:
+    put:
+      tags: [标签管理]
+      summary: 批量设置多个资源的标签
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchSetResourceTagsRequest'
+      responses:
+        '200':
+          description: 成功
+
+  # ── 调度任务 ──────────────────────────────────────────────
+  /api/v1/schedule-tasks:
+    get:
+      tags: [调度任务]
+      summary: 调度任务列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+        - name: appId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+        - name: priority
+          in: query
+          schema:
+            $ref: '#/components/schemas/Priority'
+          description: 优先级过滤
+        - name: scheduleType
+          in: query
+          schema:
+            $ref: '#/components/schemas/ScheduleType'
+          description: 调度类型过滤
+        - name: tagIds
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResult'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ScheduleTaskVO'
+    post:
+      tags: [调度任务]
+      summary: 新建调度任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScheduleTaskRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ScheduleTaskDetailVO'
+
+  /api/v1/schedule-tasks/{taskId}:
+    get:
+      tags: [调度任务]
+      summary: 调度任务详情
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ScheduleTaskDetailVO'
+    put:
+      tags: [调度任务]
+      summary: 编辑调度任务
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScheduleTaskRequest'
+      responses:
+        '200':
+          description: 成功
+    delete:
+      tags: [调度任务]
+      summary: 删除调度任务
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/schedule-tasks/{taskId}/status:
+    patch:
+      tags: [调度任务]
+      summary: 启用/停用调度任务
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskStatusRequest'
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/schedule-tasks/{taskId}/trigger:
+    post:
+      tags: [调度任务]
+      summary: 立即触发执行
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriggerTaskRequest'
+      responses:
+        '200':
+          description: 触发成功，返回执行记录 ID
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          executionId:
+                            type: string
+
+  # ── 执行记录 ──────────────────────────────────────────────
+  /api/v1/task-executions:
+    get:
+      tags: [执行记录]
+      summary: 执行记录列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: taskId
+          in: query
+          schema:
+            type: string
+        - name: appId
+          in: query
+          schema:
+            type: string
+        - name: robotId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ExecutionStatus'
+          style: form
+          explode: true
+        - name: triggerType
+          in: query
+          schema:
+            $ref: '#/components/schemas/TriggerType'
+          description: 触发方式过滤（MANUAL=手动，SCHEDULED=定时）
+        - name: triggeredBy
+          in: query
+          schema:
+            type: string
+        - name: triggerTimeStart
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: triggerTimeEnd
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: tagIds
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResult'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/TaskExecutionVO'
+
+  /api/v1/task-executions/{executionId}:
+    get:
+      tags: [执行记录]
+      summary: 执行记录详情
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskExecutionDetailVO'
+
+  /api/v1/task-executions/{executionId}/stop:
+    post:
+      tags: [执行记录]
+      summary: 停止运行中的执行
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/task-executions/{executionId}/retry:
+    post:
+      tags: [执行记录]
+      summary: 重试失败的执行
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功，返回新执行记录 ID
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          executionId:
+                            type: string
+
+  /api/v1/task-executions/callback:
+    post:
+      tags: [执行记录]
+      summary: 影刀执行结果回调（无需 JWT 认证，使用共享密钥鉴权）
+      security: []
+      parameters:
+        - name: X-Xybot-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+          description: HMAC 签名，用于验证来源合法性
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/XybotCallbackRequest'
+      responses:
+        '200':
+          description: 成功
+
+  # ── 排班看板 ──────────────────────────────────────────────
+  /api/v1/schedule-board:
+    get:
+      tags: [排班看板]
+      summary: 机器人排班看板数据
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: 查询日期，默认今天
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [day, week]
+            default: day
+        - name: groupUuid
+          in: query
+          schema:
+            type: string
+        - name: tagIds
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ScheduleBoardVO'
+
+  # ── Dashboard ──────────────────────────────────────────────
+  /api/v1/dashboard/stats:
+    get:
+      tags: [数据概览]
+      summary: 核心指标卡片
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DashboardStatsVO'
+
+  /api/v1/dashboard/execution-trend:
+    get:
+      tags: [数据概览]
+      summary: 执行趋势（近 7/30 天）
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            enum: [7, 30]
+            default: 7
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExecutionTrendVO'
+
+  /api/v1/dashboard/app-ranking:
+    get:
+      tags: [数据概览]
+      summary: 应用执行排行 Top 10
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            enum: [7, 30]
+            default: 7
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AppRankingVO'
+
+  /api/v1/dashboard/robot-utilization:
+    get:
+      tags: [数据概览]
+      summary: 机器人利用率
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: 默认今天
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RobotUtilizationVO'
+
+  /api/v1/dashboard/tag-stats:
+    get:
+      tags: [数据概览]
+      summary: 按标签统计执行量
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            enum: [7, 30]
+            default: 7
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TagStatsVO'
+
+  # ── 文件 ──────────────────────────────────────────────────
+  /api/v1/files/upload:
+    post:
+      tags: [文件]
+      summary: 上传文件（转发至影刀，用于调度参数 type=file）
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 成功，返回 fileKey
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          fileKey:
+                            type: string
+                          fileName:
+                            type: string

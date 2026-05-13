@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><script>(function(){
+  function makeStore(){
+    var data = {};
+    var api = {
+      getItem: function(k){ return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : null; },
+      setItem: function(k, v){ data[k] = String(v); },
+      removeItem: function(k){ delete data[k]; },
+      clear: function(){ data = {}; },
+      key: function(i){ return Object.keys(data)[i] || null; }
+    };
+    Object.defineProperty(api, 'length', { get: function(){ return Object.keys(data).length; } });
+    return api;
+  }
+  function tryShim(name){
+    var works = false;
+    try { works = !!window[name] && typeof window[name].getItem === 'function'; void window[name].length; }
+    catch (_) { works = false; }
+    if (works) return;
+    try { Object.defineProperty(window, name, { configurable: true, value: makeStore() }); }
+    catch (_) { try { window[name] = makeStore(); } catch (__) {} }
+  }
+  tryShim('localStorage');
+  tryShim('sessionStorage');
+})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RPA Console — 登录</title>
+<style>
+:root {
+  --bg:      oklch(99% 0.002 240);
+  --surface: oklch(100% 0 0);
+  --fg:      oklch(18% 0.012 250);
+  --muted:   oklch(54% 0.012 250);
+  --border:  oklch(92% 0.005 250);
+  --accent:  oklch(58% 0.18 255);
+  --accent-h: oklch(52% 0.18 255);
+  --accent-l: oklch(96% 0.04 255);
+  --s-err:   oklch(50% 0.16 22);
+  --s-err-bg: oklch(97% 0.04 22);
+  --f: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --fd: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --r: 6px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { font-family: var(--f); font-size: 13px; line-height: 1.5; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+/* split layout */
+.wrap { display: grid; grid-template-columns: 1fr 420px; min-height: 100vh; width: 100%; }
+
+/* left panel */
+.lp { background: var(--fg); display: flex; flex-direction: column; justify-content: space-between; padding: 48px; position: relative; overflow: hidden; }
+.lp::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 80px,
+    oklch(100% 0 0 / .02) 80px,
+    oklch(100% 0 0 / .02) 81px
+  );
+}
+.lp-brand { display: flex; align-items: center; gap: 10px; position: relative; }
+.lp-ico { width: 32px; height: 32px; background: oklch(100% 0 0 / .12); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.lp-ico svg { color: #fff; }
+.lp-name { font-size: 14px; font-weight: 600; color: #fff; letter-spacing: -.01em; }
+.lp-sub { font-size: 11px; color: oklch(100% 0 0 / .5); }
+
+.lp-hero { position: relative; }
+.lp-tag { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); background: oklch(100% 0 0 / .08); padding: 3px 8px; border-radius: 3px; display: inline-block; margin-bottom: 16px; }
+.lp-title { font-size: clamp(24px, 3vw, 36px); font-weight: 700; color: #fff; letter-spacing: -.02em; line-height: 1.2; font-family: var(--fd); margin-bottom: 16px; }
+.lp-desc { font-size: 13px; color: oklch(100% 0 0 / .55); line-height: 1.7; max-width: 360px; }
+
+.lp-features { display: flex; flex-direction: column; gap: 10px; position: relative; }
+.lp-feat { display: flex; align-items: center; gap: 10px; font-size: 12px; color: oklch(100% 0 0 / .65); }
+.lp-feat-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+/* right panel */
+.rp { background: var(--surface); display: flex; flex-direction: column; justify-content: center; padding: 48px 40px; border-left: 1px solid var(--border); }
+.rp-head { margin-bottom: 32px; }
+.rp-title { font-size: 20px; font-weight: 600; color: var(--fg); letter-spacing: -.02em; font-family: var(--fd); }
+.rp-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* tabs */
+.tabs { display: flex; border: 1px solid var(--border); border-radius: var(--r); padding: 3px; gap: 2px; margin-bottom: 24px; background: var(--bg); }
+.tab { flex: 1; text-align: center; padding: 6px 8px; font-size: 12px; font-weight: 500; cursor: pointer; border-radius: 4px; color: var(--muted); transition: all .15s; user-select: none; }
+.tab.active { background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px oklch(0% 0 0 / .06); }
+
+/* form */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 11px; font-weight: 500; color: var(--fg); margin-bottom: 5px; }
+.field-input-wrap { position: relative; }
+.field input { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--r); font-size: 13px; color: var(--fg); background: var(--surface); outline: none; font-family: var(--f); transition: border-color .15s; }
+.field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-l); }
+.field input.err { border-color: var(--s-err); }
+.field-ico { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); cursor: pointer; transition: color .1s; }
+.field-ico:hover { color: var(--fg); }
+.field-hint { font-size: 10px; color: var(--muted); margin-top: 3px; }
+.field-err { font-size: 10px; color: var(--s-err); margin-top: 3px; display: none; }
+.field-err.show { display: block; }
+
+/* error banner */
+.err-banner { background: var(--s-err-bg); border: 1px solid oklch(88% .08 22); border-radius: var(--r); padding: 9px 12px; font-size: 12px; color: var(--s-err); margin-bottom: 16px; display: none; align-items: center; gap: 7px; }
+.err-banner.show { display: flex; }
+
+/* submit */
+.btn-submit { width: 100%; padding: 10px; background: var(--fg); color: #fff; border: none; border-radius: var(--r); font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--f); transition: background .15s; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.btn-submit:hover { background: oklch(12% .012 250); }
+.btn-submit.loading { opacity: .7; pointer-events: none; }
+.spin { width: 14px; height: 14px; border: 2px solid oklch(100% 0 0 / .3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* sso panel */
+.sso-panel { display: none; }
+.sso-panel.active { display: block; }
+.pwd-panel { display: block; }
+.pwd-panel.hidden { display: none; }
+
+.sso-btn { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--f); transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--fg); margin-bottom: 12px; }
+.sso-btn:hover { border-color: var(--accent); background: var(--accent-l); color: var(--accent); }
+.sso-icon { width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+.sso-hint { font-size: 11px; color: var(--muted); text-align: center; padding: 16px 0 0; border-top: 1px solid var(--border); margin-top: 16px; line-height: 1.6; }
+
+/* footer */
+.rp-footer { margin-top: 28px; font-size: 11px; color: var(--muted); display: flex; align-items: center; justify-content: space-between; }
+.rp-footer a { color: var(--muted); text-decoration: none; transition: color .1s; }
+.rp-footer a:hover { color: var(--accent); }
+
+/* divider */
+.divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.divider-text { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+@media (max-width: 768px) {
+  .wrap { grid-template-columns: 1fr; }
+  .lp { display: none; }
+  .rp { padding: 32px 24px; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <!-- Left decorative panel -->
+  <div class="lp">
+    <div class="lp-brand">
+      <div class="lp-ico">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <rect x="2" y="2" width="6" height="6" rx="1"/><rect x="10" y="2" width="6" height="6" rx="1"/>
+          <rect x="2" y="10" width="6" height="6" rx="1"/><path d="M10 13h6M13 10v6"/>
+        </svg>
+      </div>
+      <div>
+        <div class="lp-name">RPA Console</div>
+        <div class="lp-sub">企业自动化管理平台</div>
+      </div>
+    </div>
+
+    <div class="lp-hero">
+      <div class="lp-tag">Enterprise RPA</div>
+      <div class="lp-title">统一管理<br>您的自动化资源</div>
+      <div class="lp-desc">跨子公司、跨部门的 RPA 资源精细化管理。调度任务、机器人、账号权限，全部在同一平台完成。</div>
+    </div>
+
+    <div class="lp-features">
+      <div class="lp-feat"><span class="lp-feat-dot"></span>多租户 + 部门两级隔离，数据严格不跨边界</div>
+      <div class="lp-feat"><span class="lp-feat-dot"></span>调度任务配置、触发、停止、日志全流程闭环</div>
+      <div class="lp-feat"><span class="lp-feat-dot"></span>机器人实时状态监控 · 5 分钟心跳同步</div>
+      <div class="lp-feat"><span class="lp-feat-dot"></span>云日志 / 云录屏可下载，全量执行记录可审计</div>
+    </div>
+  </div>
+
+  <!-- Right login panel -->
+  <div class="rp">
+    <div class="rp-head">
+      <div class="rp-title">欢迎回来</div>
+      <div class="rp-sub">登录后进入企业 RPA 管理控制台</div>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <div class="tab" id="tab-pwd" onclick="switchTab('pwd')">账号密码登录</div>
+      <div class="tab active" id="tab-sso" onclick="switchTab('sso')">企业 SSO 登录</div>
+    </div>
+
+    <!-- SSO Panel (default) -->
+    <div class="sso-panel active" id="sso-panel">
+      <button class="sso-btn" onclick="simulateSSO()">
+        <div class="sso-icon" style="background:#1a73e8">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round">
+            <rect x="1" y="3" width="10" height="7" rx="1"/><path d="M4 3V2a2 2 0 014 0v1"/>
+          </svg>
+        </div>
+        通过企业 SSO 系统登录
+      </button>
+
+      <div class="sso-hint">
+        点击后将跳转至企业统一认证系统（OAuth 2.0）<br>授权完成后自动返回并完成登录<br><br>
+        <strong style="color:var(--fg)">当前演示环境</strong>：SSO 跳转已模拟，点击后直接进入系统
+      </div>
+
+      <div class="divider"><span class="divider-text">或使用账号密码登录</span></div>
+
+      <button class="btn-submit" style="background:var(--surface);color:var(--fg);border:1px solid var(--border)" onclick="switchTab('pwd')">
+        切换到账号密码登录
+      </button>
+    </div>
+
+    <!-- Password Panel -->
+    <div class="pwd-panel hidden" id="pwd-panel">
+      <div class="err-banner" id="errBanner">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><path d="M7 4.5v3M7 9.5v.5"/></svg>
+        <span id="errMsg">账号或密码错误，请重新输入</span>
+      </div>
+
+      <div class="field">
+        <label>登录账号</label>
+        <div class="field-input-wrap">
+          <input type="text" id="loginAccount" placeholder="输入影刀登录账号（如：zhang.wei）" autocomplete="username">
+        </div>
+        <div class="field-err" id="errAccount">请输入登录账号</div>
+      </div>
+
+      <div class="field">
+        <label>密码</label>
+        <div class="field-input-wrap">
+          <input type="password" id="loginPwd" placeholder="输入密码" autocomplete="current-password" id="pwdInput">
+          <div class="field-ico" onclick="togglePwd()" title="显示/隐藏密码">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" id="eyeIco">
+              <ellipse cx="7" cy="7" rx="5.5" ry="3.5"/><circle cx="7" cy="7" r="1.5"/>
+            </svg>
+          </div>
+        </div>
+        <div class="field-hint">初始密码为 <code style="font-size:10px;background:var(--bg);padding:1px 5px;border-radius:3px">demo-password</code>，首次登录建议修改</div>
+        <div class="field-err" id="errPwd">请输入密码</div>
+      </div>
+
+      <button class="btn-submit" id="loginBtn" onclick="doLogin()" style="margin-top:4px">
+        登录
+      </button>
+    </div>
+
+    <div class="rp-footer">
+      <span>RPA Console v1.4</span>
+      <div style="display:flex;gap:14px">
+        <a href="#">使用帮助</a>
+        <a href="#">联系支持</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(type) {
+  const isSSO = type === 'sso';
+  document.getElementById('tab-sso').classList.toggle('active', isSSO);
+  document.getElementById('tab-pwd').classList.toggle('active', !isSSO);
+  document.getElementById('sso-panel').classList.toggle('active', isSSO);
+  document.getElementById('pwd-panel').classList.toggle('hidden', isSSO);
+  document.getElementById('errBanner').classList.remove('show');
+}
+
+function togglePwd() {
+  const inp = document.getElementById('loginPwd');
+  const ico = document.getElementById('eyeIco');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.innerHTML = '<path d="M1 7s2.5-5 6-5 6 5 6 5-2.5 5-6 5-6-5-6-5z" stroke="currentColor" stroke-width="1.3"/><path d="M2 2l10 10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>';
+  } else {
+    inp.type = 'password';
+    ico.innerHTML = '<ellipse cx="7" cy="7" rx="5.5" ry="3.5"/><circle cx="7" cy="7" r="1.5"/>';
+  }
+}
+
+function simulateSSO() {
+  const btn = document.querySelector('.sso-btn');
+  btn.innerHTML = `<div class="spin" style="border-top-color:var(--accent);border-color:var(--border);width:16px;height:16px;border-width:2px;border-radius:50%;animation:spin .7s linear infinite;display:inline-block"></div> 正在跳转至企业 SSO…`;
+  btn.disabled = true;
+  setTimeout(() => {
+    window.location.href = 'rpa-console-v3.html';
+  }, 1400);
+}
+
+function doLogin() {
+  const acc = document.getElementById('loginAccount');
+  const pwd = document.getElementById('loginPwd');
+  let ok = true;
+
+  document.getElementById('errAccount').classList.remove('show');
+  document.getElementById('errPwd').classList.remove('show');
+  document.getElementById('errBanner').classList.remove('show');
+  acc.classList.remove('err'); pwd.classList.remove('err');
+
+  if (!acc.value.trim()) {
+    document.getElementById('errAccount').classList.add('show');
+    acc.classList.add('err');
+    ok = false;
+  }
+  if (!pwd.value.trim()) {
+    document.getElementById('errPwd').classList.add('show');
+    pwd.classList.add('err');
+    ok = false;
+  }
+  if (!ok) return;
+
+  const btn = document.getElementById('loginBtn');
+  btn.innerHTML = `<div class="spin"></div> 登录中…`;
+  btn.classList.add('loading');
+
+  setTimeout(() => {
+    const validUsers = ['zhang.wei', 'li.ming', 'wang.fang', 'superadmin', 'zhao.lei', 'liu.yang', 'chen.jing'];
+    if (!validUsers.includes(acc.value.trim())) {
+      btn.innerHTML = '登录';
+      btn.classList.remove('loading');
+      document.getElementById('errMsg').textContent = '账号不存在，请确认后重试';
+      document.getElementById('errBanner').classList.add('show');
+      acc.classList.add('err');
+      return;
+    }
+    if (pwd.value !== 'demo-password') {
+      btn.innerHTML = '登录';
+      btn.classList.remove('loading');
+      document.getElementById('errMsg').textContent = '密码错误，初始密码为 demo-password';
+      document.getElementById('errBanner').classList.add('show');
+      pwd.classList.add('err');
+      return;
+    }
+    window.location.href = 'rpa-console-v3.html';
+  }, 900);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !document.getElementById('pwd-panel').classList.contains('hidden')) doLogin();
+});
+</script>
+</body>
+</html>
